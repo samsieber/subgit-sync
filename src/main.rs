@@ -1,3 +1,8 @@
+#[macro_use]
+extern crate log;
+extern crate subgit_rs;
+
 fn main() {
-    println!("Hello, world!");
+    subgit_rs::setup_logging();
+    info!("Hello, world!");
 }
