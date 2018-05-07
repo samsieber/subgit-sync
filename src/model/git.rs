@@ -1,12 +1,12 @@
 use git2::{Repository, Signature, Commit, Oid, ObjectType};
 use Error;
 
-pub fn commit_empty(repo: &Repository, signature: &Signature, message: &str, parents: &[&Commit]) -> Result<Oid, Box<Error>>{
+pub fn commit_empty(repo: &Repository, author: &Signature, committer: &Signature, message: &str, parents: &[&Commit]) -> Result<Oid, Box<Error>>{
     let new_empty_index_oid = repo.index()?.write_tree()?;
     let new_empty_object = repo.find_object(new_empty_index_oid, Some(ObjectType::Tree))?;
     let new_empty_tree = new_empty_object.as_tree().unwrap();
 
-    Ok(repo.commit(Some("HEAD"), &signature, &signature, &message, new_empty_tree, &parents)?)
+    Ok(repo.commit(Some("HEAD"), &author, &committer, &message, new_empty_tree, &parents)?)
 }
 
 pub fn get_refs(repo: &Repository, glob: &str) -> Result<Vec<(String, Oid)>, Box<Error>>{

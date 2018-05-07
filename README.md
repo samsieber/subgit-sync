@@ -98,7 +98,6 @@ To translate a commit from one repository to the other, the following logic is u
  It's a repo so that if we run into errors while copying commits, we can reset the state back to the HEAD.
  
  ## To Do
- * See if setting the file properties (last updated, etc.) on files yields deterministic commit shas.
  * Implement commit sha map & rolling back when pushing fails
  * Use the signatures from the first commit found in the upstream for the empty commit in the subgit
  * Create an empty ref in the upstream for orphaned branches in the subgit (so those don't break the script)

@@ -4,4 +4,3 @@
 **/*.rs.bk
 .idea/
 foo.txt
-src/model/mod.rs
