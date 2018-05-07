@@ -99,7 +99,6 @@ To translate a commit from one repository to the other, the following logic is u
  
  ## To Do
  * Implement commit sha map & rolling back when pushing fails
- * Use the signatures from the first commit found in the upstream for the empty commit in the subgit
  * Create an empty ref in the upstream for orphaned branches in the subgit (so those don't break the script)
  * Write the subgit hook logic
  * Write a command to place the hook in the subg dir
