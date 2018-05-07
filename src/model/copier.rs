@@ -2,7 +2,6 @@ use git2::{Commit, Delta, Index, IndexAddOption, ObjectType, Oid, Repository, Re
 use super::map::CommitMapper;
 use std::path::{Path, PathBuf};
 use std::fs::OpenOptions;
-use std::fs::File;
 use std::io::Write;
 use std::fs;
 
@@ -28,10 +27,6 @@ impl<'a> GitLocation<'a> {
         &self.working
             .workdir()
             .expect("The map repo must have a workdir")
-    }
-
-    fn work_path<S: AsRef<str>>(&self, s: S) -> PathBuf {
-        return self.workdir().join(s.as_ref());
     }
 }
 
@@ -88,17 +83,6 @@ impl<'a> Copier<'a> {
     pub fn get_dest_sha(&'a self, source_sha: &Oid) -> Oid {
         self.mapper
             .get_translated(Some(*source_sha), self.source.name, self.dest.name)
-            .unwrap()
-    }
-
-    fn get_dest_commit(&'a self, source_sha: &Oid) -> Commit {
-        self.dest
-            .working
-            .find_commit(
-                self.mapper
-                    .get_translated(Some(*source_sha), self.source.name, self.dest.name)
-                    .unwrap(),
-            )
             .unwrap()
     }
 

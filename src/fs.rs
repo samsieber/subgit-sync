@@ -6,7 +6,14 @@ use std::fs::OpenOptions;
 use std::io::Read;
 use std::io::Write;
 
-pub use std::fs::{copy, create_dir, create_dir_all};
+pub use std::fs::{copy, create_dir, create_dir_all, remove_dir_all};
+
+pub fn remove_if_exists(path: &Path) -> Result<(), Box<Error>> {
+    if path.exists() {
+        remove_dir_all(&path)?;
+    }
+    Ok(())
+}
 
 pub fn content_of_file_if_exists<P: AsRef<Path>>(path: &P) -> Option<String> {
     let path: &Path = path.as_ref();

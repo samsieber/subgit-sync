@@ -1,5 +1,26 @@
 use git2::{Commit, ObjectType, Oid, Repository, Signature};
+use git2;
 use Error;
+use std::path::Path;
+
+pub fn open_or_clone_bare<P: AsRef<Path>>(path: P, url: &str) -> Repository {
+    match Repository::open_bare(&path) {
+        Ok(repo) => repo,
+        Err(e) => {
+            info!(
+                "Couldn't open repo at {}, attempting clone from {}. Original error: {:?}",
+                &path.as_ref().to_string_lossy(),
+                &url,
+                e
+            );
+            let mut builder = git2::build::RepoBuilder::new();
+            match builder.bare(true).clone(url, path.as_ref()) {
+                Ok(repo) => repo,
+                Err(e) => panic!("failed to open or clone clone: {}", e),
+            }
+        }
+    }
+}
 
 pub fn commit_empty(
     repo: &Repository,
@@ -23,7 +44,7 @@ pub fn commit_empty(
 }
 
 pub fn get_refs(repo: &Repository, glob: &str) -> Result<Vec<(String, Oid)>, Box<Error>> {
-    let ref_list: Result<Vec<(String, Oid)>, _> = repo.references_glob("refs/heads/*")?
+    let ref_list: Result<Vec<(String, Oid)>, _> = repo.references_glob(glob)?
         .map(|r| {
             let rr = r?;
             Ok((

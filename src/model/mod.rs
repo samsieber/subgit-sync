@@ -1,4 +1,4 @@
-use git2::{Commit, Oid, PushOptions, RemoteCallbacks, Repository, Sort};
+use git2::{Oid, PushOptions, RemoteCallbacks, Repository, Sort};
 use std::path::{Path, PathBuf};
 use std;
 use std::error::Error;
@@ -8,15 +8,20 @@ use fs;
 mod git;
 mod map;
 mod copier;
+mod settings;
+
+pub use self::git::open_or_clone_bare;
+use log::LevelFilter;
 
 pub struct WrappedSubGit {
     pub location: PathBuf,
     pub map: Repository,
     pub upstream_working: Repository,
     pub upstream_bare: Repository,
+    pub upstream_path: String,
     pub local_working: Repository,
     pub local_bare: Repository,
-    pub subdir: String,
+    pub local_path: String,
 }
 
 fn reverse_topological() -> Sort {
@@ -53,14 +58,19 @@ impl WrappedSubGit {
     pub fn open<SP: AsRef<Path>>(subgit_location: SP) -> Result<WrappedSubGit, Box<Error>> {
         let subgit_top_path: &Path = subgit_location.as_ref();
         let subgit_path = subgit_top_path.join("data");
+        let git_settings = settings::Settings::load(&subgit_path);
+
+        git_settings.setup_logging();
+
         Ok(WrappedSubGit {
             location: subgit_path.to_owned(),
             map: Repository::open(subgit_path.join("map"))?,
             upstream_working: Repository::open(subgit_path.join("upstream"))?,
             upstream_bare: Repository::open(subgit_path.join("upstream.git"))?,
+            upstream_path: git_settings.upstream_path(),
             local_working: Repository::open(subgit_path.join("local"))?,
             local_bare: Repository::open(subgit_path.join("local.git"))?,
-            subdir: String::new(),
+            local_path: git_settings.local_path(),
         })
     }
 
@@ -98,13 +108,13 @@ impl WrappedSubGit {
                 name: "upstream",
                 bare: &self.upstream_bare,
                 working: &self.upstream_working,
-                location: &self.subdir.as_str().as_ref(),
+                location: &self.upstream_path.as_str().as_ref(),
             },
             dest: copier::GitLocation {
                 name: "local",
                 bare: &self.local_bare,
                 working: &self.local_working,
-                location: "new".as_ref(),
+                location: &self.local_path.as_ref(),
             },
             mapper: &mapper,
         };
@@ -117,7 +127,7 @@ impl WrappedSubGit {
 
         let new_sha = sha_copier.get_dest_sha(new_upstream_sha);
 
-        let branch = sha_copier
+        let _branch = sha_copier
             .dest
             .working
             .branch(
@@ -238,14 +248,17 @@ impl WrappedSubGit {
             mirror_working.reference("refs/sync/empty", new_empty_base_commit, false, "")?;
         }
 
+        settings::Settings::generate(&subgit_data_path, subdir_loc.to_string(), "".to_string(), LevelFilter::Debug);
+
         Ok(WrappedSubGit {
             location: subgit_location.as_ref().to_owned(),
             map: map,
             upstream_working: upstream_working,
             upstream_bare: upstream_bare,
+            upstream_path: subdir_loc.to_owned(),
             local_working: mirror_working,
             local_bare: Repository::open_bare(subgit_data_path.join("local.git"))?,
-            subdir: subdir_loc.to_owned(),
+            local_path: "".to_owned(),
         })
     }
 }

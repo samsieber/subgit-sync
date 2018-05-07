@@ -1,6 +1,5 @@
 use git2::{Oid, Repository};
 use std::str;
-use std::io::Write;
 use Path;
 use hex;
 use fs;
@@ -12,7 +11,7 @@ pub struct CommitMapper<'a> {
 fn sha_path(sha: &Oid) -> String {
     let depth = 4;
     let sha_length = 40;
-    let mut sha_path = String::with_capacity(40 + depth);
+    let mut sha_path = String::with_capacity(sha_length + depth);
 
     hex::encode(sha.as_bytes())
         .as_str()
