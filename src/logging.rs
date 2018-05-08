@@ -1,8 +1,7 @@
 use std::path::Path;
 use log::LevelFilter;
-use simplelog::{CombinedLogger, TermLogger, WriteLogger, Config};
+use simplelog::{CombinedLogger, Config, TermLogger, WriteLogger};
 use std::fs::File;
-
 
 pub fn setup_logging() {
     CombinedLogger::init(vec![
@@ -16,7 +15,11 @@ pub fn setup_logging() {
     debug!("Logging started");
 }
 
-pub fn configure_logging<P : AsRef<Path>>(stdout_level: LevelFilter, file_level: LevelFilter, file_path: &P){
+pub fn configure_logging<P: AsRef<Path>>(
+    stdout_level: LevelFilter,
+    file_level: LevelFilter,
+    file_path: &P,
+) {
     CombinedLogger::init(vec![
         TermLogger::new(stdout_level, Config::default()).unwrap(),
         WriteLogger::new(

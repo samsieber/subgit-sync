@@ -13,15 +13,23 @@ extern crate hex;
 extern crate simplelog;
 
 use std::error::Error;
-use std::path::{Path};
+use std::path::Path;
 
 mod model;
 mod fs;
 mod logging;
-mod control;
+mod action;
+mod cli;
+mod util;
 
 pub use logging::setup_logging;
 pub use model::WrappedSubGit;
+
+pub fn run() -> Result<(),Box<Error>> {
+    let exec_env = cli::ExecEnv::detect();
+    let action = exec_env.parse_command(std::env::args())?;
+    action.run()
+}
 
 pub fn run_import_test(id: &str, remote: &str, subdir: &str) -> Result<(), Box<Error>> {
     let top = Path::new("data").join(id);

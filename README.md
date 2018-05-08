@@ -98,6 +98,15 @@ To translate a commit from one repository to the other, the following logic is u
  It's a repo so that if we run into errors while copying commits, we can reset the state back to the HEAD.
  
  ## To Do
+ * Implement setup for new args mode
+    * Runs the setup
+    * Copies itself as the pre-receive and then symlinks itself as the post update script
+    * Maybe add a way to symlink the pre-receive too?
+ * Setup tests using the post-parsing data
+ 
+ * Add support for more branches / repos - maybe add a filter in the data file?
+ * Add a way to script tests randomly crawling a repo
+ 
  * Implement commit sha map & rolling back when pushing fails
  * Create an empty ref in the upstream for orphaned branches in the subgit (so those don't break the script)
  * Write the subgit hook logic
