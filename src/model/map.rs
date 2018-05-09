@@ -1,6 +1,6 @@
 use git2::{Oid, Repository};
 use std::str;
-use Path;
+use std::path::Path;
 use hex;
 use fs;
 

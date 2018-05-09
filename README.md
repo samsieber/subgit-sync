@@ -99,9 +99,25 @@ To translate a commit from one repository to the other, the following logic is u
  
  ## To Do
  * Implement setup for new args mode
-    * Runs the setup
-    * Copies itself as the pre-receive and then symlinks itself as the post update script
-    * Maybe add a way to symlink the pre-receive too?
+    * Setup
+        * Runs the setup
+            * Need to add a empty ref upstream too (if it doesn't exist)
+        * Copies itself as the pre-receive and then symlinks itself as the post update script
+        * Runs the sync all
+        * Maybe add a way to symlink the pre-receive too?
+    * Sync all
+        * Syncs each ref that exists upstream
+        * Removes refs that don't exist upstream
+    * Sync branch
+        * Sync or remove the branch
+    * Precommit Hook
+        * Read the branch info from the stdin
+        * Sync to upstream
+        * Push - rollback if there's an error
+    * Pass to subgit
+        * Calls the hook in the subgit repo to do the appropriate logic
+            * Might need to set the git_dir variable - do we need one of those?
+    
  * Setup tests using the post-parsing data
  
  * Add support for more branches / repos - maybe add a filter in the data file?

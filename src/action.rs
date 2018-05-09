@@ -1,16 +1,24 @@
 use std::path::PathBuf;
 use log::LevelFilter;
 use std::error::Error;
+use std::fs::File;
+use fs2::FileExt;
+use git2::Oid;
 
 pub type RunResult = Result<(), Box<Error>>;
 
+pub struct SubGitEnv {
+    pub git_dir: PathBuf,
+    pub hook_path: PathBuf,
+}
+
 pub struct SyncRef {
     pub ref_name: String,
-    pub subgit: PathBuf,
+    pub env: SubGitEnv,
 }
 
 pub struct SyncAll {
-    pub subgit: PathBuf,
+    pub env: SubGitEnv,
 }
 
 pub struct Setup {
@@ -33,12 +41,15 @@ pub struct Setup {
     pub subgit_hook_path: Option<PathBuf>,
 }
 
-pub struct Hook {
-    pub subgit: PathBuf,
+pub struct UpdateHook {
+    pub env: SubGitEnv,
+    pub ref_name: String,
+    pub old_sha: Oid,
+    pub new_sha: Oid,
 }
 
 pub struct PassToSubgit {
-    pub path: PathBuf,
+    pub env: SubGitEnv,
     pub args: Vec<String>,
 }
 
@@ -46,22 +57,36 @@ pub enum Action {
     SyncRef(SyncRef),
     SyncAll(SyncAll),
     Setup(Setup),
-    Hook(Hook),
+    UpdateHook(UpdateHook),
     PassToSubgit(PassToSubgit),
 }
 
 impl Setup {
     fn run(self) -> RunResult {
-        let subgit_map_path = self.subgit_map_path.map(|v| v.to_string_lossy().to_string());
+        let subgit_map_path = self.subgit_map_path
+            .map(|v| v.to_string_lossy().to_string());
         let wrapped = ::model::WrappedSubGit::run_creation(
             self.subgit_git_location,
             self.upstream_git_location,
             self.upstream_map_path.to_str().unwrap(),
             subgit_map_path.as_ref().map(String::as_str),
             self.log_level,
-        );
+        )?;
+        wrapped.update_all_from_upstream()?;
 
         panic!("Implementation not finished yet");
+    }
+}
+
+impl UpdateHook {
+    pub fn run(self) -> RunResult {
+        let wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
+        let file = File::open("file.lock")?;
+        file.lock_exclusive()?;
+
+        wrapped.push_ref_change_upstream(self.ref_name, self.old_sha, self.new_sha)?;
+
+        Ok(())
     }
 }
 

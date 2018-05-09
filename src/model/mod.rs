@@ -3,14 +3,15 @@ use std::path::{Path, PathBuf};
 use std;
 use std::error::Error;
 use git2;
-use fs;
 
-mod git;
+use fs;
+use git;
+use util;
+
 mod map;
 mod copier;
 mod settings;
 
-pub use self::git::open_or_clone_bare;
 use log::LevelFilter;
 
 pub struct WrappedSubGit {
@@ -22,36 +23,6 @@ pub struct WrappedSubGit {
     pub local_working: Repository,
     pub local_bare: Repository,
     pub local_path: String,
-}
-
-fn reverse_topological() -> Sort {
-    let mut bits = 0 as u32;
-    bits |= Sort::TOPOLOGICAL.bits();
-    bits |= Sort::REVERSE.bits();
-    Sort::from_bits(bits).unwrap()
-}
-
-fn reverse_topological_time() -> Sort {
-    let mut bits = 0 as u32;
-    bits |= Sort::TOPOLOGICAL.bits();
-    bits |= Sort::REVERSE.bits();
-    bits |= Sort::TIME.bits();
-    Sort::from_bits(bits).unwrap()
-}
-
-fn find_earliest_commit(repo: &Repository) -> Oid {
-    let walker = &mut repo.revwalk().unwrap();
-    walker
-        .push(
-            repo.find_reference("HEAD")
-                .unwrap()
-                .peel_to_commit()
-                .unwrap()
-                .id(),
-        )
-        .unwrap();
-    walker.set_sorting(reverse_topological_time());
-    walker.nth(1).unwrap().unwrap()
 }
 
 impl WrappedSubGit {
@@ -74,19 +45,85 @@ impl WrappedSubGit {
         })
     }
 
-    fn get_commits_to_import(
+    pub fn push_ref_change_upstream<S: AsRef<str>>(
         &self,
-        old_upstream_sha: Option<Oid>,
-        new_upstream_sha: &Oid,
-    ) -> Vec<Oid> {
-        let walker = &mut self.upstream_bare.revwalk().unwrap();
-        if let Some(old_sha) = old_upstream_sha {
-            walker.hide(old_sha).unwrap();
+        ref_name: S,
+        old_sha: Oid,
+        new_sha: Oid,
+    ) -> Result<(), Box<Error>> {
+        let old = if old_sha == git::no_sha() {
+            None
+        } else {
+            Some(old_sha)
+        };
+        let new = if new_sha == git::no_sha() {
+            None
+        } else {
+            Some(new_sha)
+        };
+
+        if new == None {
+            self.local_bare.reflog_delete(ref_name.as_ref())?;
+            return Ok(());
         }
-        walker.push(*new_upstream_sha).unwrap();
-        walker.set_sorting(reverse_topological());
-        let res: Result<Vec<Oid>, _> = walker.collect();
-        return res.unwrap();
+
+        let mapper = map::CommitMapper { map: &self.map };
+
+        let old_upstream = mapper.get_translated(old, "local", "upstream");
+        let real_upstream = self.upstream_bare
+            .find_reference(ref_name.as_ref())
+            .map(|reference| {
+                Some(
+                    reference
+                        .target()
+                        .expect("Reference is not direct - need to check for that"),
+                )
+            })
+            .unwrap_or(None);
+
+        if old_upstream != real_upstream && real_upstream != None {
+            let new_old_local_sha = self.import_upstream_commits(
+                ref_name.as_ref(),
+                old_upstream,
+                &real_upstream.unwrap(),
+            );
+            if old != new_old_local_sha {
+                return Err(Box::new(util::StringError {
+                    message: "Out of sync with the upstream repo!".to_owned(),
+                }));
+            }
+        }
+
+        self.export_local_commits(ref_name.as_ref(), old, &new_sha);
+
+        Ok(())
+    }
+
+
+    fn export_local_commits(
+        &self,
+        ref_name: &str,
+        old_local_sha: Option<Oid>,
+        new_local_sha: &Oid,
+    ) -> Option<Oid> {
+        let mapper = map::CommitMapper { map: &self.map };
+        let sha_copier = copier::Copier {
+            dest: copier::GitLocation {
+                name: "upstream",
+                bare: &self.upstream_bare,
+                working: &self.upstream_working,
+                location: &self.upstream_path.as_str().as_ref(),
+            },
+            source: copier::GitLocation {
+                name: "local",
+                bare: &self.local_bare,
+                working: &self.local_working,
+                location: &self.local_path.as_ref(),
+            },
+            mapper: &mapper,
+        };
+
+        sha_copier.copy_ref_unchecked(ref_name, old_local_sha, new_local_sha)
     }
 
     fn import_upstream_commits(
@@ -94,15 +131,8 @@ impl WrappedSubGit {
         ref_name: &str,
         old_upstream_sha: Option<Oid>,
         new_upstream_sha: &Oid,
-    ) {
-        if Some(*new_upstream_sha) == old_upstream_sha {
-            return;
-        }
-
+    ) -> Option<Oid> {
         let mapper = map::CommitMapper { map: &self.map };
-
-        let commits = self.get_commits_to_import(old_upstream_sha, new_upstream_sha);
-
         let sha_copier = copier::Copier {
             source: copier::GitLocation {
                 name: "upstream",
@@ -119,61 +149,31 @@ impl WrappedSubGit {
             mapper: &mapper,
         };
 
-        let maybe_new_sha: Option<Oid> = commits.into_iter()
-            .filter(|&oid| !mapper.has_sha(&oid, "upstream", "local"))
-            //.take(20)
-            .map(|oid| sha_copier.copy_commit(&oid))
-            .last();
-
-        let new_sha = sha_copier.get_dest_sha(new_upstream_sha);
-
-        let _branch = sha_copier
-            .dest
-            .working
-            .branch(
-                "test",
-                &sha_copier.dest.working.find_commit(new_sha).unwrap(),
-                true,
-            )
-            .unwrap();
-        println!("Remote: {}", ref_name);
-        let mut callbacks = RemoteCallbacks::new();
-        callbacks.push_update_reference(|name, err| {
-            println!("{:?}", err);
-            Ok(())
-        });
-        let mut push_opts = PushOptions::new();
-        push_opts.remote_callbacks(callbacks);
-        let mut remote = sha_copier.dest.working.find_remote("origin").unwrap();
-        sha_copier.dest.working.set_head("refs/heads/test").unwrap();
-
-        let refspec_str = format!("refs/heads/test:{}", ref_name);
-        let refspec_ref = refspec_str.as_str();
-        println!("{}", refspec_str);
-        let parts: Vec<&str> = vec![refspec_ref];
-        remote.push(&parts, Some(&mut push_opts)).unwrap();
+        sha_copier.copy_ref_unchecked(ref_name, old_upstream_sha, new_upstream_sha)
     }
 
     pub fn update_all_from_upstream(&self) -> Result<(), Box<Error>> {
         let mut local_refs: std::collections::HashMap<String, git2::Oid> =
-            git::get_refs(&self.upstream_bare, "**")?
+            git::get_refs(&self.local_bare, "**")?
                 .into_iter()
-                .filter(|&(ref name, ref _target)| git::is_standard(&name))
+                .filter(|&(ref name, ref _target)| git::is_not_tag(&name))
                 .collect();
 
         let mapper = map::CommitMapper { map: &self.map };
 
         git::get_refs(&self.upstream_bare, "**")?
             .into_iter()
-            .filter(|&(ref name, ref _target)| git::is_standard(&name))
+            .filter(|&(ref name, ref _target)| git::is_not_tag(&name))
             .for_each(|(ref_name, upstream_sha)| {
                 info!("Importing {}", ref_name);
                 let local_sha = local_refs.remove(&ref_name);
+                info!(
+                    "Importing {} to point to {} (Was {:?} in the local)",
+                    ref_name, upstream_sha, local_sha
+                );
                 let old_upstream_sha = mapper.get_translated(local_sha, "upstream", "local");
 
-                if old_upstream_sha != Some(upstream_sha) {
-                    &self.import_upstream_commits(&ref_name, old_upstream_sha, &upstream_sha);
-                }
+                &self.import_upstream_commits(&ref_name, old_upstream_sha, &upstream_sha);
             });
 
         // TODO: iterate over the leftover keys
@@ -186,7 +186,13 @@ impl WrappedSubGit {
         upstream_location: UP,
         subdir_loc: &str,
     ) -> Result<WrappedSubGit, Box<Error>> {
-        WrappedSubGit::run_creation(subgit_location, upstream_location, subdir_loc, None, LevelFilter::Debug)
+        WrappedSubGit::run_creation(
+            subgit_location,
+            upstream_location,
+            subdir_loc,
+            None,
+            LevelFilter::Debug,
+        )
     }
 
     pub fn run_creation<SP: AsRef<Path>, UP: AsRef<Path>>(
@@ -247,7 +253,8 @@ impl WrappedSubGit {
         info!("Adding general purpose empty commit in mirror working directory");
         let upstream_bare = Repository::open_bare(subgit_data_path.join("upstream.git"))?;
         {
-            let earliest_commit = upstream_bare.find_commit(find_earliest_commit(&upstream_bare))?;
+            let earliest_commit =
+                upstream_bare.find_commit(git::find_earliest_commit(&upstream_bare))?;
             let new_empty_base_commit = git::commit_empty(
                 &mirror_working,
                 &earliest_commit.author(),
@@ -255,7 +262,12 @@ impl WrappedSubGit {
                 "Empty base commit - autogenerated",
                 &vec![],
             )?;
-            mirror_working.reference("refs/sync/empty", new_empty_base_commit, false, "generating empty base commit")?;
+            mirror_working.reference(
+                "refs/sync/empty",
+                new_empty_base_commit,
+                false,
+                "generating empty base commit",
+            )?;
         }
 
         settings::Settings::generate(

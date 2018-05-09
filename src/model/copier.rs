@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::fs;
+use git;
 
 pub struct GitLocation<'a> {
     pub location: &'a Path,
@@ -27,6 +28,21 @@ impl<'a> GitLocation<'a> {
         &self.working
             .workdir()
             .expect("The map repo must have a workdir")
+    }
+
+    pub fn get_commits_between(
+        &self,
+        maybe_starting_sha: Option<Oid>,
+        dest_sha_inclusive: &Oid,
+    ) -> Vec<Oid> {
+        let walker = &mut self.working.revwalk().unwrap();
+        if let Some(starting_sha) = maybe_starting_sha {
+            walker.hide(starting_sha).unwrap();
+        }
+        walker.push(*dest_sha_inclusive).unwrap();
+        walker.set_sorting(git::reverse_topological());
+        let res: Result<Vec<Oid>, _> = walker.collect();
+        return res.unwrap();
     }
 }
 
@@ -84,6 +100,32 @@ impl<'a> Copier<'a> {
         self.mapper
             .get_translated(Some(*source_sha), self.source.name, self.dest.name)
             .unwrap()
+    }
+
+    pub fn copy_ref_unchecked(
+        &'a self,
+        ref_name: &str,
+        old_source_sha: Option<Oid>,
+        new_source_sha: &Oid,
+    ) -> Option<Oid> {
+        if Some(*new_source_sha) == old_source_sha {
+            return None;
+        }
+
+        let commits = self.source
+            .get_commits_between(old_source_sha, new_source_sha); //self.get_commits_to_import(old_upstream_sha, new_upstream_sha);
+
+        commits.into_iter()
+            .filter(|&oid| !self.mapper.has_sha(&oid, "upstream", "local"))
+            //.take(20)
+            .map(|oid| self.copy_commit(&oid))
+            .last();
+
+        let new_sha = self.get_dest_sha(new_source_sha);
+
+        git::push_sha(&self.dest.working, new_sha, ref_name).unwrap();
+
+        Some(new_sha)
     }
 
     pub fn copy_commit(&'a self, source_sha: &Oid) -> Oid {

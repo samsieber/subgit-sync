@@ -8,6 +8,7 @@ extern crate structopt;
 extern crate serde;
 extern crate toml;
 
+extern crate fs2;
 extern crate git2;
 extern crate hex;
 extern crate simplelog;
@@ -21,11 +22,12 @@ mod logging;
 mod action;
 mod cli;
 mod util;
+mod git;
 
 pub use logging::setup_logging;
 pub use model::WrappedSubGit;
 
-pub fn run() -> Result<(),Box<Error>> {
+pub fn run() -> Result<(), Box<Error>> {
     let exec_env = cli::ExecEnv::detect();
     let action = exec_env.parse_command(std::env::args())?;
     action.run()
@@ -39,7 +41,7 @@ pub fn run_import_test(id: &str, remote: &str, subdir: &str) -> Result<(), Box<E
     // Setup test data location, cleaning out old subgit
     fs::create_dir_all(&top)?;
     fs::remove_if_exists(&subgit_path)?;
-    model::open_or_clone_bare(&upstream_path, remote);
+    git::open_or_clone_bare(&upstream_path, remote);
 
     let wrapped = model::WrappedSubGit::create_or_fail(subgit_path, upstream_path, subdir)?;
 
