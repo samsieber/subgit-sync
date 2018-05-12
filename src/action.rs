@@ -4,6 +4,11 @@ use std::error::Error;
 use std::fs::File;
 use fs2::FileExt;
 use git2::Oid;
+use std::process::Command;
+use std::env;
+use git;
+use std::process::Stdio;
+use std::io::Write;
 
 pub type RunResult = Result<(), Box<Error>>;
 
@@ -14,9 +19,16 @@ pub struct SubGitEnv {
 }
 
 #[derive(Debug)]
-pub struct SyncRef {
-    pub ref_name: String,
+pub struct SyncRefs {
+    pub requests: Vec<RefSyncRequest>,
     pub env: SubGitEnv,
+}
+
+#[derive(Debug)]
+pub struct RefSyncRequest {
+    pub ref_name: String,
+    pub old_upstream_sha: Oid,
+    pub new_upstream_sha: Oid,
 }
 
 #[derive(Debug)]
@@ -54,24 +66,34 @@ pub struct UpdateHook {
 }
 
 #[derive(Debug)]
-pub struct PassToSubgit {
+pub struct RequestSync {
     pub env: SubGitEnv,
-    pub args: Vec<String>,
     pub stdin: Vec<u8>,
 }
 
 #[derive(Debug)]
 pub enum Action {
-    SyncRef(SyncRef),
+    SyncRefs(SyncRefs),
     SyncAll(SyncAll),
     Setup(Setup),
     UpdateHook(UpdateHook),
-    PassToSubgit(PassToSubgit),
+    RequestSync(RequestSync),
 }
 
-impl PassToSubgit {
+impl RequestSync {
     fn run(self) -> RunResult {
-        panic!("Not implemented");
+        if git::get_git_options().unwrap_or(vec!()).iter().any(|x| x == "IGNORE_SUBGIT_UPDATE") {
+            return Ok(());
+        }
+        let mut child = Command::new(self.env.hook_path)
+            .env_clear()
+            .env("PATH", env::var("PATH").unwrap())
+            .stdin(Stdio::piped())
+            .arg("sync-refs")
+            .spawn()
+            .unwrap();
+        child.stdin.as_mut().unwrap().write_all(&self.stdin);
+        Ok(())
     }
 }
 
@@ -121,7 +143,25 @@ impl SyncAll {
         let file = File::open(wrapped.location.join("hook"))?;
         file.lock_exclusive()?;
 
-        wrapped.update_all_from_upstream();
+        wrapped.update_all_from_upstream()?;
+
+        Ok(())
+    }
+}
+
+impl SyncRefs {
+    pub fn run(self) -> RunResult {
+        let wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
+        let file = File::open(wrapped.location.join("hook"))?;
+        file.lock_exclusive()?;
+
+        for request in self.requests {
+            wrapped.import_upstream_commits(
+                &request.ref_name,
+                git::optionify_sha(request.old_upstream_sha),
+                git::optionify_sha(request.new_upstream_sha),
+            );
+        };
 
         Ok(())
     }
@@ -134,6 +174,7 @@ impl Action {
             Action::Setup(setup) => setup.run(),
             Action::UpdateHook(update) => update.run(),
             Action::SyncAll(sync_all) => sync_all.run(),
+            Action::SyncRefs(sync_refs) => sync_refs.run(),
             _ => panic!("Implementation not finished"),
         }
     }

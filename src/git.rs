@@ -7,6 +7,24 @@ use git2::RemoteCallbacks;
 use git2::PushOptions;
 use util::StringError;
 
+pub fn get_git_options() -> Option<Vec<String>> {
+    std::env::var_os("GIT_PUSH_OPTION_COUNT").map(|v| {
+        let git_opt_count = v.into_string().expect("GIT_PUSH_OPTION_COUNT is unreadable").parse::<u32>().expect("GIT_PUSH_OPTION_COUNT is supposed to be a env variable that's a number");
+
+        (0..git_opt_count).map(|i|
+            std::env::var(&format!("GIT_PUSH_OPTION_{}", i)).expect(&format!("GIT_PUSH_OPTION_{} was unreadable", i))
+        ).collect::<Vec<String>>()
+    })
+}
+
+pub fn optionify_sha(oid: Oid) -> Option<Oid> {
+    if oid == no_sha() {
+        None
+    } else {
+        Some(oid)
+    }
+}
+
 pub fn no_sha() -> Oid {
     Oid::from_str("0000000000000000000000000000000000000000").unwrap()
 }

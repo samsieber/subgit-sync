@@ -99,7 +99,7 @@ impl WrappedSubGit {
             let new_old_local_sha = self.import_upstream_commits(
                 ref_name.as_ref(),
                 old_upstream,
-                &real_upstream.unwrap(),
+                real_upstream,
             );
             if old != new_old_local_sha {
                 return Err(Box::new(util::StringError {
@@ -139,14 +139,14 @@ impl WrappedSubGit {
             mapper: &mapper,
         };
 
-        sha_copier.copy_ref_unchecked(ref_name, old_local_sha, new_local_sha, Some(vec!("IGNORE_SUBGIT_UPDATE".to_owned())))
+        sha_copier.copy_ref_unchecked(ref_name, old_local_sha, Some(*new_local_sha), Some(vec!("IGNORE_SUBGIT_UPDATE".to_owned())))
     }
 
-    fn import_upstream_commits(
+    pub fn import_upstream_commits(
         &self,
         ref_name: &str,
         old_upstream_sha: Option<Oid>,
-        new_upstream_sha: &Oid,
+        new_upstream_sha: Option<Oid>,
     ) -> Option<Oid> {
         let mapper = map::CommitMapper { map: &self.map };
         let sha_copier = copier::Copier {
@@ -189,7 +189,7 @@ impl WrappedSubGit {
                 );
                 let old_upstream_sha = mapper.get_translated(local_sha, "upstream", "local");
 
-                &self.import_upstream_commits(&ref_name, old_upstream_sha, &upstream_sha);
+                &self.import_upstream_commits(&ref_name, old_upstream_sha, Some(upstream_sha));
             });
 
         // TODO: iterate over the leftover keys

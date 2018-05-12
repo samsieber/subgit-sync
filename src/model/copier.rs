@@ -107,16 +107,21 @@ impl<'a> Copier<'a> {
         &'a self,
         ref_name: &str,
         old_source_sha: Option<Oid>,
-        new_source_sha: &Oid,
+        new_source_sha: Option<Oid>,
         git_push_opts: Option<Vec<String>>,
     ) -> Option<Oid> {
         debug!("Copying ref {:?} {:?}", old_source_sha, new_source_sha);
-        if Some(*new_source_sha) == old_source_sha {
+        if new_source_sha == old_source_sha {
+            return new_source_sha;
+        }
+
+        if new_source_sha == None {
+            self.source.bare.reflog_delete(ref_name.as_ref()).expect("Could not remove reference!");
             return None;
         }
 
         let commits = self.source
-            .get_commits_between(old_source_sha, new_source_sha); //self.get_commits_to_import(old_upstream_sha, new_upstream_sha);
+            .get_commits_between(old_source_sha, &new_source_sha.unwrap()); //self.get_commits_to_import(old_upstream_sha, new_upstream_sha);
 
         commits.into_iter()
             .filter(|&oid| !self.mapper.has_sha(&oid, "upstream", "local"))
@@ -125,7 +130,7 @@ impl<'a> Copier<'a> {
             .last();
 
         debug!("Copied commits - now copying branch");
-        let new_sha = self.get_dest_sha(new_source_sha);
+        let new_sha = self.get_dest_sha(&new_source_sha.unwrap());
 
         let res = git::push_sha_ext(&self.dest.working, new_sha, ref_name, git_push_opts);
 

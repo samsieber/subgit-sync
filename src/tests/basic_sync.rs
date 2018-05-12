@@ -105,7 +105,7 @@ fn run() -> Res<()> {
     assert_dir_content_equal(&local, &up.join("sub"));
 
     {
-        util::write_files(&up, hashmap!{ "testing" => "Overwritten in upstream" }.iter())?;
+        util::write_files(&up, hashmap!{ "sub/testing" => "Overwritten in upstream" }.iter())?;
 
         util::command(&up, "git", ["add", "."].iter())?;
         util::command(&up, "git", ["commit", "-m", "This is the third test"].iter())?;

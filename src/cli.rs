@@ -105,12 +105,8 @@ impl ExecEnv {
         I::Item: Into<OsString> + Clone,
     {
         match self {
-            ExecEnv::Upstream(env) => Ok(Action::PassToSubgit(action::PassToSubgit {
+            ExecEnv::Upstream(env) => Ok(Action::RequestSync(action::RequestSync {
                 env,
-                args: iterable
-                    .into_iter()
-                    .map(|v| v.into().to_string_lossy().into_owned())
-                    .collect(),
                 stdin: std::io::stdin().bytes().collect::<Result<Vec<u8>,_>>()?,
             })),
             ExecEnv::Subgit(env) => {
@@ -126,10 +122,35 @@ impl ExecEnv {
                         })),
                     },
                     3 => match string_args.first().unwrap().as_str() {
-                        "sync-branch" => Ok(Action::SyncRef(action::SyncRef {
-                            env,
-                            ref_name: string_args.get(2).unwrap().clone(),
-                        })),
+
+                        "sync-refs" => {
+
+                            let stdin_bytes = std::io::stdin().bytes().collect::<Result<Vec<u8>,_>>()?;
+
+                            let s = match std::str::from_utf8(&stdin_bytes) {
+                                Ok(v) => v,
+                                Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+                            };
+
+                            let reqs = s.split("\n").map(|line| -> Result<action::RefSyncRequest, Box<Error>> {
+                                let entries = line.split(" ").collect::<Vec<&str>>();
+                                match entries[..] {
+                                    [ref_name, old_sha, new_sha] => Ok(action::RefSyncRequest {
+                                        ref_name: ref_name.to_string(),
+                                        old_upstream_sha: Oid::from_str(old_sha)?,
+                                        new_upstream_sha: Oid::from_str(new_sha)?,
+                                    }),
+                                    _ => Err(Box::new(StringError {
+                                        message: "Bad args".to_owned()
+                                    })),
+                                }
+                            }).collect::<Result<Vec<action::RefSyncRequest>, Box<Error>>>()?;
+
+                            Ok(Action::SyncRefs(action::SyncRefs {
+                                env,
+                                requests: reqs,
+                            }))
+                        },
                         bad_arg => Err(Box::new(StringError {
                             message: format!("Invalid argument: '{}'", bad_arg).to_owned(),
                         })),
