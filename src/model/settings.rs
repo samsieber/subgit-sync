@@ -1,8 +1,6 @@
 use toml;
-use serde;
 use log::LevelFilter;
 use std::path::{Path, PathBuf};
-use std::fs::File;
 use logging;
 use fs;
 
@@ -55,9 +53,9 @@ impl Settings {
 
     pub fn setup_logging(&self) {
         logging::configure_logging(
-            LevelFilter::Warn,
+            LevelFilter::Debug,
             self.internal.file_log_level,
-            &self.data_dir.join("log").join("file.log"),
+            &self.data_dir.join("logs").join("file.log"),
         );
     }
 }

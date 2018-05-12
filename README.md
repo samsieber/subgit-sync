@@ -117,6 +117,9 @@ To translate a commit from one repository to the other, the following logic is u
     * Pass to subgit
         * Calls the hook in the subgit repo to do the appropriate logic
             * Might need to set the git_dir variable - do we need one of those?
+            
+ * Change locking to lock on setting file
+ * Have setup place the hook in the data dir, and then symlink from there
     
  * Setup tests using the post-parsing data
  

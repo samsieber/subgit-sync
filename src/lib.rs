@@ -4,6 +4,8 @@ extern crate log;
 extern crate serde_derive;
 #[macro_use]
 extern crate structopt;
+#[macro_use]
+extern crate maplit;
 
 extern crate serde;
 extern crate toml;
@@ -24,6 +26,9 @@ mod cli;
 mod util;
 mod git;
 
+#[cfg(test)]
+mod tests;
+
 pub use logging::setup_logging;
 pub use model::WrappedSubGit;
 
@@ -41,11 +46,13 @@ pub fn run_import_test(id: &str, remote: &str, subdir: &str) -> Result<(), Box<E
     // Setup test data location, cleaning out old subgit
     fs::create_dir_all(&top)?;
     fs::remove_if_exists(&subgit_path)?;
+    fs::remove_if_exists(&upstream_path)?;
     git::open_or_clone_bare(&upstream_path, remote);
+    fs::remove_if_exists(upstream_path.join("hooks").join("post-receive"))?;
 
     let wrapped = model::WrappedSubGit::create_or_fail(subgit_path, upstream_path, subdir)?;
 
-    wrapped.update_all_from_upstream();
+    wrapped.update_all_from_upstream()?;
 
     Ok(())
 }

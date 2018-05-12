@@ -35,7 +35,8 @@ impl<'a> GitLocation<'a> {
         maybe_starting_sha: Option<Oid>,
         dest_sha_inclusive: &Oid,
     ) -> Vec<Oid> {
-        let walker = &mut self.working.revwalk().unwrap();
+        debug!("Finding commits in {} between {:?} and {:?}", self.bare.path().to_string_lossy(), maybe_starting_sha, dest_sha_inclusive);
+        let walker = &mut self.bare.revwalk().unwrap();
         if let Some(starting_sha) = maybe_starting_sha {
             walker.hide(starting_sha).unwrap();
         }
@@ -107,7 +108,9 @@ impl<'a> Copier<'a> {
         ref_name: &str,
         old_source_sha: Option<Oid>,
         new_source_sha: &Oid,
+        git_push_opts: Option<Vec<String>>,
     ) -> Option<Oid> {
+        debug!("Copying ref {:?} {:?}", old_source_sha, new_source_sha);
         if Some(*new_source_sha) == old_source_sha {
             return None;
         }
@@ -121,19 +124,28 @@ impl<'a> Copier<'a> {
             .map(|oid| self.copy_commit(&oid))
             .last();
 
+        debug!("Copied commits - now copying branch");
         let new_sha = self.get_dest_sha(new_source_sha);
 
-        git::push_sha(&self.dest.working, new_sha, ref_name).unwrap();
+        let res = git::push_sha_ext(&self.dest.working, new_sha, ref_name, git_push_opts);
+
+        match &res {
+            Ok(_) => (),
+            Err(err) => eprint!("{}", &err)
+        };
+
+        res.unwrap();
 
         Some(new_sha)
     }
 
     pub fn copy_commit(&'a self, source_sha: &Oid) -> Oid {
+        debug!("About to export commit {}", source_sha);
         // Get the source parents
         let source_commit = self.source
             .bare
             .find_commit(*source_sha)
-            .expect("Couldn't find commit specified!");
+            .expect(&format!("Couldn't find commit specified! {}", source_sha));
         let source_parent_shas: Vec<Oid> = source_commit.parent_ids().collect();
 
         // Get the dest parents  - use the empty commit as a parent if there would be not parents otherwise
@@ -163,7 +175,7 @@ impl<'a> Copier<'a> {
             .unwrap();
         info!("Set head to {}", new_dest_head);
 
-        info!("\nImporting {}, {:?}", source_sha, source_parent_shas);
+        info!("\nCopying {}, {:?}", source_sha, source_parent_shas);
         let source_parent_tree = source_parent_shas
             .first()
             .map(|sha| self.source.bare.find_commit(*sha).unwrap().tree().unwrap());
@@ -235,7 +247,7 @@ impl<'a> Copier<'a> {
             }
         });
 
-        if (source_parent_shas.len() > 1) {
+        if source_parent_shas.len() > 1 {
             debug!(
                 "Deduped parent list from {} to {}",
                 source_parent_shas.len(),
@@ -261,7 +273,6 @@ impl<'a> Copier<'a> {
             index.write().unwrap();
             let index_tree_oid = index.write_tree().unwrap();
             let index_tree = self.dest.working.find_tree(index_tree_oid).unwrap();
-            let signature = self.dest.working.signature().unwrap();
             let parent_commits: Vec<Commit> = dest_parent_commit_shas
                 .iter()
                 .map(|parent_sha| self.dest.working.find_commit(*parent_sha).unwrap())

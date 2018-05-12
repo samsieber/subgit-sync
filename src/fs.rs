@@ -2,14 +2,15 @@ use std;
 use std::path::{Path, PathBuf};
 use std::error::Error;
 use std::fs::File;
+use std::fs::symlink_metadata;
 use std::fs::OpenOptions;
 use std::io::Read;
 use std::io::Write;
 
 pub use std::fs::{copy, create_dir, create_dir_all, remove_dir_all};
 
-pub fn remove_if_exists(path: &Path) -> Result<(), Box<Error>> {
-    if path.exists() {
+pub fn remove_if_exists<P: AsRef<Path>>(path: P) -> Result<(), Box<Error>> {
+    if symlink_metadata(path.as_ref()).is_ok() {
         remove_dir_all(&path)?;
     }
     Ok(())
@@ -32,7 +33,7 @@ pub fn content_of_file_if_exists<P: AsRef<Path>>(path: &P) -> Option<String> {
 pub fn write_content_to_file<P: AsRef<Path>, S: AsRef<str>>(path: &P, content: &S) {
     let path: &Path = path.as_ref();
 
-    std::fs::create_dir_all(path.parent().expect("Parent surely exists"));
+    std::fs::create_dir_all(path.parent().expect("Parent surely exists")).unwrap();
 
     let mut file = OpenOptions::new()
         .read(true)

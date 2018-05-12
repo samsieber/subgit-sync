@@ -2,8 +2,10 @@ use git2::{Commit, ObjectType, Oid, Repository, Signature, Sort};
 use git2;
 use std::error::Error;
 use std::path::Path;
+use std;
 use git2::RemoteCallbacks;
 use git2::PushOptions;
+use util::StringError;
 
 pub fn no_sha() -> Oid {
     Oid::from_str("0000000000000000000000000000000000000000").unwrap()
@@ -55,28 +57,33 @@ pub fn find_earliest_commit(repo: &Repository) -> Oid {
         )
         .unwrap();
     walker.set_sorting(reverse_topological_time());
-    walker.nth(1).unwrap().unwrap()
+    walker.nth(0).unwrap().unwrap()
 }
 
-pub fn push_sha<S: AsRef<str>>(repo: &Repository, sha: Oid, ref_name: S) -> Result<(), Box<Error>> {
-    println!("Remote: {}", ref_name.as_ref());
-    let mut callbacks = RemoteCallbacks::new();
-    callbacks.push_update_reference(|name, err| {
-        println!("{:?}", err);
-        Ok(())
-    });
+pub fn push_sha_ext<S: AsRef<str>>(repo: &Repository, sha: Oid, ref_name: S, git_push_options: Option<Vec<String>>) -> Result<(), Box<Error>> {
+    let mut process = std::process::Command::new("git");
+    process
+        .env_clear()
+        .env("PATH", std::env::var("PATH").unwrap());
+    if let Some(git_push_opts) = git_push_options {
+        process.env("GIT_PUSH_OPTION_COUNT", format!("{}", git_push_opts.len()));
+        for (idx, val) in git_push_opts.iter().enumerate() {
+            process.env(format!("GIT_PUSH_OPTION_{}", idx), val);
+        }
+    };
+    process.arg("push");
+    process.arg("origin");
+    process.arg(format!("HEAD:{}", ref_name.as_ref()));
 
-    let mut push_opts = PushOptions::new();
-    push_opts.remote_callbacks(callbacks);
-    let mut remote = repo.find_remote("origin").unwrap();
-    repo.set_head_detached(sha).unwrap();
+    process.current_dir(repo.workdir().unwrap());
 
-    let refspec_str = format!("HEAD:{}", ref_name.as_ref());
-    let refspec_ref = refspec_str.as_str();
-    println!("{}", refspec_str);
+    println!("Pushing from {:?}", repo.workdir());
 
-    let parts: Vec<&str> = vec![refspec_ref];
-    remote.push(&parts, Some(&mut push_opts)).unwrap();
+    let result = process.output()?;
+
+    if !result.status.success() {
+        return Err(Box::new(StringError { message: format!("Could not push - exit code was {}. Full result of push: {}", &result.status, String::from_utf8(result.stderr)?) }));
+    }
 
     Ok(())
 }

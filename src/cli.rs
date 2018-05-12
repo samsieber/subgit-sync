@@ -1,12 +1,13 @@
 use std::env;
 use std::path::PathBuf;
 use std::error::Error;
-use std::fs::{canonicalize, read_link, symlink_metadata};
+use std::fs::{canonicalize, read_link};
 use std::ffi::OsString;
+use std;
+use std::io::Read;
 use log::LevelFilter;
 use structopt::StructOpt;
 use action::{Action, SubGitEnv};
-use git2;
 use git2::Oid;
 use action;
 use util::StringError;
@@ -64,20 +65,22 @@ impl ExecEnv {
         let args: Vec<_> = env::args().collect();
         let git_os_dir = env::var_os("GIT_DIR");
 
+        println!("Current Path: {:?}, Current Git DIR: {:?}", env::current_exe().unwrap(), git_os_dir);
+
         match git_os_dir {
             Some(git_os_path) => {
                 let git_path = canonicalize(git_os_path).expect("Cannot open the GIT_DIR");
                 if git_path.join("data").join("settings.toml").is_file() {
+                    println!("In subgit repo");
                     ExecEnv::Subgit(SubGitEnv {
-                        git_dir: git_path,
-                        hook_path: env::current_exe().expect("This is essential!"),
+                        git_dir: git_path.clone(),
+                        hook_path: git_path.join("data").join("hook"),
                     })
                 } else {
+                    println!("In upstream repo");
                     let hook_path = find_subgit_from_hook().expect("Cannot follow symlink");
-                    let subgit_repo =
-                        git2::Repository::discover(&hook_path).expect("Cannot find subgit path");
-                    if !subgit_repo
-                        .path()
+                    let repo_path = hook_path.parent().unwrap().parent().unwrap();
+                    if !repo_path
                         .join("data")
                         .join("settings.toml")
                         .is_file()
@@ -85,8 +88,8 @@ impl ExecEnv {
                         panic!("Cannot find subgit path!");
                     };
                     ExecEnv::Upstream(SubGitEnv {
-                        git_dir: subgit_repo.path().to_owned(),
-                        hook_path,
+                        git_dir: repo_path.to_owned(),
+                        hook_path: hook_path.to_owned(),
                     })
                 }
             }
@@ -108,6 +111,7 @@ impl ExecEnv {
                     .into_iter()
                     .map(|v| v.into().to_string_lossy().into_owned())
                     .collect(),
+                stdin: std::io::stdin().bytes().collect::<Result<Vec<u8>,_>>()?,
             })),
             ExecEnv::Subgit(env) => {
                 let args: Vec<_> = iterable.into_iter().collect();
@@ -115,29 +119,29 @@ impl ExecEnv {
                     .map(|v| v.clone().into().to_string_lossy().into_owned())
                     .collect();
                 match args.len() {
-                    1 => match string_args.first().unwrap().as_str() {
+                    2 => match string_args.first().unwrap().as_str() {
                         "sync-all" => Ok(Action::SyncAll(action::SyncAll { env })),
                         bad_arg => Err(Box::new(StringError {
                             message: format!("Invalid argument: '{}'", bad_arg).to_owned(),
                         })),
                     },
-                    2 => match string_args.first().unwrap().as_str() {
+                    3 => match string_args.first().unwrap().as_str() {
                         "sync-branch" => Ok(Action::SyncRef(action::SyncRef {
                             env,
-                            ref_name: string_args.get(1).unwrap().clone(),
+                            ref_name: string_args.get(2).unwrap().clone(),
                         })),
                         bad_arg => Err(Box::new(StringError {
                             message: format!("Invalid argument: '{}'", bad_arg).to_owned(),
                         })),
                     },
-                    3 => Ok(Action::UpdateHook(action::UpdateHook {
+                    4 => Ok(Action::UpdateHook(action::UpdateHook {
                         env,
-                        ref_name: string_args.get(0).unwrap().clone(),
-                        old_sha: Oid::from_str(string_args.get(1).unwrap())?,
-                        new_sha: Oid::from_str(string_args.get(1).unwrap())?,
+                        ref_name: string_args.get(1).unwrap().clone(),
+                        old_sha: Oid::from_str(string_args.get(2).unwrap())?,
+                        new_sha: Oid::from_str(string_args.get(3).unwrap())?,
                     })),
                     _ => Err(Box::new(StringError {
-                        message: format!("Invalid argument: '{}'", string_args.join(" ")),
+                        message: format!("Unknown argument structure: '{}'", string_args.join(" ")),
                     })),
                 }
             }

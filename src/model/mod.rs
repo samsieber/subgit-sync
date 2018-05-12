@@ -1,4 +1,4 @@
-use git2::{Oid, PushOptions, RemoteCallbacks, Repository, Sort};
+use git2::{Oid, Repository};
 use std::path::{Path, PathBuf};
 use std;
 use std::error::Error;
@@ -25,17 +25,25 @@ pub struct WrappedSubGit {
     pub local_path: String,
 }
 
+pub struct BinSource {
+    pub location: PathBuf,
+    pub symlink: bool,
+}
+
 impl WrappedSubGit {
     pub fn open<SP: AsRef<Path>>(subgit_location: SP) -> Result<WrappedSubGit, Box<Error>> {
         let subgit_top_path: &Path = subgit_location.as_ref();
         let subgit_path = subgit_top_path.join("data");
+        println!("Loading settings");
         let git_settings = settings::Settings::load(&subgit_path);
+        println!("Loaded settings");
 
         git_settings.setup_logging();
+        println!("Setup logging");
 
         Ok(WrappedSubGit {
             location: subgit_path.to_owned(),
-            map: Repository::open(subgit_path.join("map"))?,
+            map: Repository::open(subgit_path.join("map")).expect("Cannot find map file"),
             upstream_working: Repository::open(subgit_path.join("upstream"))?,
             upstream_bare: Repository::open(subgit_path.join("upstream.git"))?,
             upstream_path: git_settings.upstream_path(),
@@ -51,6 +59,7 @@ impl WrappedSubGit {
         old_sha: Oid,
         new_sha: Oid,
     ) -> Result<(), Box<Error>> {
+        println!("Starting on hook!");
         let old = if old_sha == git::no_sha() {
             None
         } else {
@@ -62,11 +71,13 @@ impl WrappedSubGit {
             Some(new_sha)
         };
 
+        println!("Post option adjustment");
         if new == None {
             self.local_bare.reflog_delete(ref_name.as_ref())?;
             return Ok(());
         }
 
+        info!("Updating ref: {} from {:?} -> {:?}", ref_name.as_ref(), old, new);
         let mapper = map::CommitMapper { map: &self.map };
 
         let old_upstream = mapper.get_translated(old, "local", "upstream");
@@ -81,7 +92,10 @@ impl WrappedSubGit {
             })
             .unwrap_or(None);
 
+        info!("Found upstream commits");
+
         if old_upstream != real_upstream && real_upstream != None {
+            info!("Importing new upstream commits first");
             let new_old_local_sha = self.import_upstream_commits(
                 ref_name.as_ref(),
                 old_upstream,
@@ -93,6 +107,8 @@ impl WrappedSubGit {
                 }));
             }
         }
+
+        info!("About to export commits");
 
         self.export_local_commits(ref_name.as_ref(), old, &new_sha);
 
@@ -123,7 +139,7 @@ impl WrappedSubGit {
             mapper: &mapper,
         };
 
-        sha_copier.copy_ref_unchecked(ref_name, old_local_sha, new_local_sha)
+        sha_copier.copy_ref_unchecked(ref_name, old_local_sha, new_local_sha, Some(vec!("IGNORE_SUBGIT_UPDATE".to_owned())))
     }
 
     fn import_upstream_commits(
@@ -149,7 +165,7 @@ impl WrappedSubGit {
             mapper: &mapper,
         };
 
-        sha_copier.copy_ref_unchecked(ref_name, old_upstream_sha, new_upstream_sha)
+        sha_copier.copy_ref_unchecked(ref_name, old_upstream_sha, new_upstream_sha, None)
     }
 
     pub fn update_all_from_upstream(&self) -> Result<(), Box<Error>> {
@@ -192,6 +208,12 @@ impl WrappedSubGit {
             subdir_loc,
             None,
             LevelFilter::Debug,
+            BinSource {
+                location: PathBuf::from("target/debug/hook"),
+                symlink: true,
+            },
+            None,
+            None,
         )
     }
 
@@ -201,6 +223,9 @@ impl WrappedSubGit {
         upstream_map_path: &str,
         subgit_map_path: Option<&str>,
         log_level: LevelFilter,
+        bin_loc: BinSource,
+        subgit_hook_path: Option<PathBuf>,
+        upstream_hook_path: Option<PathBuf>,
     ) -> Result<WrappedSubGit, Box<Error>> {
         let subgit_path: &Path = subgit_location.as_ref();
         let upstream_path: &Path = upstream_location.as_ref();
@@ -208,6 +233,9 @@ impl WrappedSubGit {
 
         Repository::open_bare(&upstream_path)?;
         Repository::init_bare(&subgit_path)?;
+
+        info!("Creating the logging directory");
+        fs::create_dir_all(subgit_data_path.join("logs"))?;
 
         info!("Creating the mapping repo");
         let map = Repository::init(subgit_data_path.join("map"))?;
@@ -246,7 +274,7 @@ impl WrappedSubGit {
 
         info!("Create mirror working directory (for moving changes from upstream -> subdir)");
         let mirror_working = Repository::clone(
-            &subgit_path.to_string_lossy(),
+            &mirror_raw_path.to_string_lossy(),
             subgit_data_path.join("local"),
         )?;
 
@@ -255,6 +283,7 @@ impl WrappedSubGit {
         {
             let earliest_commit =
                 upstream_bare.find_commit(git::find_earliest_commit(&upstream_bare))?;
+            debug!("Found earliest commit!");
             let new_empty_base_commit = git::commit_empty(
                 &mirror_working,
                 &earliest_commit.author(),
@@ -270,12 +299,26 @@ impl WrappedSubGit {
             )?;
         }
 
+        info!("Generating settings file");
         settings::Settings::generate(
             &subgit_data_path,
             upstream_map_path.to_string(),
             subgit_map_path.unwrap_or("").to_owned(),
             log_level,
         );
+
+        info!("Copying hook file");
+        let hook_path = subgit_location.as_ref().join("data").join("hook");
+        match bin_loc {
+            BinSource {location, symlink: true } => std::os::unix::fs::symlink(fs::make_absolute(location)?, &hook_path)?,
+            BinSource {location, symlink: false } => { std::fs::copy(location, &hook_path)?; },
+        };
+
+        info!("Adding subgit hook");
+        std::os::unix::fs::symlink(fs::make_absolute(&hook_path)?, subgit_location.as_ref().join(subgit_hook_path.unwrap_or(PathBuf::from("hooks/update"))))?;
+
+        info!("Adding upstream hook");
+        std::os::unix::fs::symlink(fs::make_absolute(&hook_path)?, upstream_location.as_ref().join(upstream_hook_path.unwrap_or(PathBuf::from("hooks/post-receive"))))?;
 
         Ok(WrappedSubGit {
             location: subgit_location.as_ref().to_owned(),
