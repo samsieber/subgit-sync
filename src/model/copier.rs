@@ -1,4 +1,4 @@
-use git2::{Commit, Delta, Index, IndexAddOption, ObjectType, Oid, Repository, ResetType};
+use git2::{Commit, Delta, Index, IndexAddOption, ObjectType, Oid, Repository, ResetType, Remote, build::CheckoutBuilder};
 use super::map::CommitMapper;
 use std::path::{Path, PathBuf};
 use std::fs::OpenOptions;
@@ -145,13 +145,15 @@ impl<'a> Copier<'a> {
     }
 
     pub fn copy_commit(&'a self, source_sha: &Oid) -> Oid {
-        debug!("About to export commit {}", source_sha);
+        debug!("About to export commit {} from {}", source_sha, self.source.bare.path().to_string_lossy());
         // Get the source parents
         let source_commit = self.source
             .bare
             .find_commit(*source_sha)
             .expect(&format!("Couldn't find commit specified! {}", source_sha));
+        debug!("Source commit found");
         let source_parent_shas: Vec<Oid> = source_commit.parent_ids().collect();
+        source_parent_shas.iter().for_each(|v| debug!("Source commit parent: {}", v));
 
         // Get the dest parents  - use the empty commit as a parent if there would be not parents otherwise
         let mut dest_parent_commit_shas = source_parent_shas
@@ -160,25 +162,40 @@ impl<'a> Copier<'a> {
             .collect();
         dedup_vec(&mut dest_parent_commit_shas);
         if dest_parent_commit_shas.is_empty() {
+            debug!("Adding empty commit as dest commit parent");
             dest_parent_commit_shas.push(self.empty_sha());
         }
+        dest_parent_commit_shas.iter().for_each(|v| debug!("Dest commit parent: {}", v));
         let dest_parent_commits: Vec<Commit> = dest_parent_commit_shas
             .iter()
-            .map(|parent_sha| self.dest.working.find_commit(*parent_sha).unwrap())
+            .map(|parent_sha| self.dest.bare.find_commit(*parent_sha).unwrap())
             .collect();
 
         // Checkout the first dest parent
         let new_dest_head = *dest_parent_commit_shas.get(0).unwrap();
         self.dest.working.set_head_detached(new_dest_head);
+        debug!("Checked out the first parent");
         self.dest
             .working
-            .reset(
-                dest_parent_commits.first().unwrap().as_object(),
-                ResetType::Hard,
-                None,
-            )
+            .checkout_head(Some(CheckoutBuilder::new().force()))
             .unwrap();
         info!("Set head to {}", new_dest_head);
+        
+        let n : Vec<&str> = vec!();
+        ::util::command_raw(self.source.workdir(), "ls", n.iter()).ok().map(|v|
+            trace!("Source files: {}", String::from_utf8(v.stdout).unwrap())
+        );
+        ::util::command_raw(self.source.workdir(), "ls", ["sub"].iter()).ok().map(|v|
+            trace!("Source files: {}", String::from_utf8(v.stdout).unwrap())
+        );
+        ::util::command_raw(self.dest.workdir(), "ls", n.iter()).ok().map(|v|
+            trace!("Dest files: {}", String::from_utf8(v.stdout).unwrap())
+        );
+        ::util::command_raw(self.dest.workdir(), "ls", ["sub"].iter()).ok().map(|v|
+            trace!("Dest files: {}", String::from_utf8(v.stdout).unwrap())
+        );
+
+        let parent_commit =
 
         info!("\nCopying {}, {:?}", source_sha, source_parent_shas);
         let source_parent_tree = source_parent_shas
@@ -217,7 +234,7 @@ impl<'a> Copier<'a> {
                             .unwrap()
                             .peel_to_blob()
                             .unwrap();
-                        file.write_all(new_blob.content());
+                        file.write_all(new_blob.content()).unwrap();
                         changes = true;
                     });
                 }
@@ -235,7 +252,7 @@ impl<'a> Copier<'a> {
                             .unwrap()
                             .peel_to_blob()
                             .unwrap();
-                        file.write_all(new_blob.content());
+                        file.write_all(new_blob.content()).unwrap();
                         changes = true
                     });
                 }

@@ -33,7 +33,7 @@ impl error::Error for StringError {
 }
 
 pub fn write_files<P, K,V,I>(root: P, files: I) -> Result<(), Box<Error>>
-    where P: AsRef<Path>, K: AsRef<Path>, V: AsRef<[u8]>, I: Iterator<Item=(K,V)>
+    where P: AsRef<Path>, K: AsRef<Path>, V: AsRef<[u8]>, I: IntoIterator<Item=(K,V)>
 {
     let root_dir = root.as_ref();
 

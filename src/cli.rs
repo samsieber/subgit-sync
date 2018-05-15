@@ -114,15 +114,10 @@ impl ExecEnv {
                 let string_args: Vec<String> = args.iter()
                     .map(|v| v.clone().into().to_string_lossy().into_owned())
                     .collect();
+                string_args.iter().for_each(|v| println!("Arg: {}", v));
                 match args.len() {
-                    2 => match string_args.first().unwrap().as_str() {
+                    2 => match string_args[1].as_str() {
                         "sync-all" => Ok(Action::SyncAll(action::SyncAll { env })),
-                        bad_arg => Err(Box::new(StringError {
-                            message: format!("Invalid argument: '{}'", bad_arg).to_owned(),
-                        })),
-                    },
-                    3 => match string_args.first().unwrap().as_str() {
-
                         "sync-refs" => {
 
                             let stdin_bytes = std::io::stdin().bytes().collect::<Result<Vec<u8>,_>>()?;
@@ -132,14 +127,20 @@ impl ExecEnv {
                                 Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
                             };
 
-                            let reqs = s.split("\n").map(|line| -> Result<action::RefSyncRequest, Box<Error>> {
+                            let reqs = s.lines().map(|v| v.trim()).map(|line| -> Result<action::RefSyncRequest, Box<Error>> {
                                 let entries = line.split(" ").collect::<Vec<&str>>();
+                                entries.iter().for_each(|v| println!("Value: {}", v));
+                                println!("OLD: {}", Oid::from_str(&entries[0])?);
+                                println!("OLD: {}", Oid::from_str(&entries[1])?);
                                 match entries[..] {
-                                    [ref_name, old_sha, new_sha] => Ok(action::RefSyncRequest {
-                                        ref_name: ref_name.to_string(),
-                                        old_upstream_sha: Oid::from_str(old_sha)?,
-                                        new_upstream_sha: Oid::from_str(new_sha)?,
-                                    }),
+                                    [old_sha, new_sha, ref_name] => {
+                                        println!("{} {} {}", old_sha, new_sha, ref_name);
+                                        Ok(action::RefSyncRequest {
+                                            ref_name: ref_name.to_string(),
+                                            old_upstream_sha: Oid::from_str(old_sha)?,
+                                            new_upstream_sha: Oid::from_str(new_sha)?,
+                                        })
+                                    },
                                     _ => Err(Box::new(StringError {
                                         message: "Bad args".to_owned()
                                     })),

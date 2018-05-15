@@ -1,4 +1,6 @@
 mod basic_sync;
+mod single_branch_basic;
+mod test_util;
 
 #[test]
 fn it_works() {

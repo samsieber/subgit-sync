@@ -78,6 +78,27 @@ pub fn find_earliest_commit(repo: &Repository) -> Oid {
     walker.nth(0).unwrap().unwrap()
 }
 
+pub fn fetch_all_ext(repo: &Repository) -> Result<(), Box<Error>> {
+    let mut process = std::process::Command::new("git");
+    process
+        .env_clear()
+        .env("PATH", std::env::var("PATH").unwrap());
+    process.arg("fetch");
+    process.arg("--all");
+
+    process.current_dir(repo.workdir().unwrap());
+
+    debug!("Fetching all in {:?}", repo.workdir());
+
+    let result = process.output()?;
+
+    if !result.status.success() {
+        return Err(Box::new(StringError { message: format!("Could not fetch all- exit code was {}. Full result of fetch: {}", &result.status, String::from_utf8(result.stderr)?) }));
+    }
+
+    Ok(())
+}
+
 pub fn push_sha_ext<S: AsRef<str>>(repo: &Repository, sha: Oid, ref_name: S, git_push_options: Option<Vec<String>>) -> Result<(), Box<Error>> {
     let mut process = std::process::Command::new("git");
     process

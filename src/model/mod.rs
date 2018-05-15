@@ -53,6 +53,11 @@ impl WrappedSubGit {
         })
     }
 
+    pub fn update_self(&self) {
+        git::fetch_all_ext(&self.local_working).unwrap();
+        git::fetch_all_ext(&self.upstream_working).unwrap();
+    }
+
     pub fn push_ref_change_upstream<S: AsRef<str>>(
         &self,
         ref_name: S,
@@ -297,6 +302,7 @@ impl WrappedSubGit {
                 false,
                 "generating empty base commit",
             )?;
+            git::push_sha_ext(&mirror_working, new_empty_base_commit, "refs/sync/empty", None)?;
         }
 
         info!("Generating settings file");

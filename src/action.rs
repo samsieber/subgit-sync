@@ -85,9 +85,10 @@ impl RequestSync {
         if git::get_git_options().unwrap_or(vec!()).iter().any(|x| x == "IGNORE_SUBGIT_UPDATE") {
             return Ok(());
         }
-        let mut child = Command::new(self.env.hook_path)
+        let mut child = Command::new(&self.env.hook_path)
             .env_clear()
             .env("PATH", env::var("PATH").unwrap())
+            .env("GIT_DIR",  self.env.hook_path.parent().unwrap().parent().unwrap().to_string_lossy().as_ref())
             .stdin(Stdio::piped())
             .arg("sync-refs")
             .spawn()
@@ -125,11 +126,13 @@ impl UpdateHook {
         println!("Running update");
         println!("Trying to open wrapped git: {:?}", ::fs::make_absolute(&self.env.git_dir));
         let wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
+
         println!("Opened wrapped");
         println!("Trying to lock on {:?}", ::fs::make_absolute(wrapped.location.join("hook")));
         let file = File::open(wrapped.location.join("hook"))?;
         file.lock_exclusive()?;
         println!("Locked!");
+        wrapped.update_self();
         wrapped.push_ref_change_upstream(self.ref_name, self.old_sha, self.new_sha)?;
 
         Ok(())
@@ -143,6 +146,7 @@ impl SyncAll {
         let file = File::open(wrapped.location.join("hook"))?;
         file.lock_exclusive()?;
 
+        wrapped.update_self();
         wrapped.update_all_from_upstream()?;
 
         Ok(())
@@ -155,6 +159,7 @@ impl SyncRefs {
         let file = File::open(wrapped.location.join("hook"))?;
         file.lock_exclusive()?;
 
+        wrapped.update_self();
         for request in self.requests {
             wrapped.import_upstream_commits(
                 &request.ref_name,
@@ -175,6 +180,7 @@ impl Action {
             Action::UpdateHook(update) => update.run(),
             Action::SyncAll(sync_all) => sync_all.run(),
             Action::SyncRefs(sync_refs) => sync_refs.run(),
+            Action::RequestSync(request_sync) => request_sync.run(),
             _ => panic!("Implementation not finished"),
         }
     }
