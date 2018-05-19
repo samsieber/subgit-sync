@@ -14,6 +14,7 @@ extern crate fs2;
 extern crate git2;
 extern crate hex;
 extern crate simplelog;
+extern crate nix;
 
 use std::error::Error;
 use std::path::Path;
@@ -31,6 +32,7 @@ mod tests;
 
 pub use logging::setup_logging;
 pub use model::WrappedSubGit;
+pub use util::fork_into_child;
 
 pub fn run() -> Result<(), Box<Error>> {
     let exec_env = cli::ExecEnv::detect();

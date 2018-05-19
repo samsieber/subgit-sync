@@ -14,7 +14,7 @@ pub fn clear_path<P: AsRef<Path>>(path: P) {
     create_dir_all(&path).unwrap();
 }
 
-pub fn test_dir(path: &'static str) -> PathBuf {
+pub fn test_dir(path: &str) -> PathBuf {
     let p = PathBuf::from(format!("test_data/{}", path));
     clear_path(&p);
     p

@@ -9,6 +9,7 @@ use std::env;
 use git;
 use std::process::Stdio;
 use std::io::Write;
+use std::ffi::OsString;
 
 pub type RunResult = Result<(), Box<Error>>;
 
@@ -93,7 +94,7 @@ impl RequestSync {
             .arg("sync-refs")
             .spawn()
             .unwrap();
-        child.stdin.as_mut().unwrap().write_all(&self.stdin);
+        child.stdin.as_mut().expect("Could not get stdin for child sync-refs child process").write_all(&self.stdin);
         Ok(())
     }
 }
@@ -155,6 +156,8 @@ impl SyncAll {
 
 impl SyncRefs {
     pub fn run(self) -> RunResult {
+        super::util::fork_into_child();
+
         let wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
         let file = File::open(wrapped.location.join("hook"))?;
         file.lock_exclusive()?;

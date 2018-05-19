@@ -11,11 +11,6 @@ fn main() {
         "Others",
     );
 
-    //    let res = subgit_rs::run_import_test(
-    //        "test2",
-    //        "https://github.com/git-repo-samples/kotlin-dsl.git",
-    //        "provider",
-    //    );
     info!("{:?}", res);
     res.expect("Failed test");
 }

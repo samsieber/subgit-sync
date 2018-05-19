@@ -8,7 +8,8 @@ use model::BinSource;
 use simplelog::TermLogger;
 use simplelog::Config;
 use super::test_util::*;
-use std::ops::Index;
+use std::thread;
+use std::time::Duration;
 
 pub fn run_basic_branch_test<P,K,V,F,I>(root: P, files_collection: I) -> Result<(), Box<Error>>
 where P: AsRef<Path>, K: AsRef<Path>, V: AsRef<[u8]>, F: IntoIterator<Item=(K,V)>, I: IntoIterator<Item=F>
@@ -16,7 +17,6 @@ where P: AsRef<Path>, K: AsRef<Path>, V: AsRef<[u8]>, F: IntoIterator<Item=(K,V)
     let mut files = files_collection.into_iter();
 
     let _ = TermLogger::init(LevelFilter::Debug, Config::default());
-//    let empty : Vec<String> = vec!();
     let d = root.as_ref();
     let up_bare = init_bare_repo("test.git", &d)?;
     let up = clone(&d, &up_bare)?;
@@ -73,6 +73,7 @@ where P: AsRef<Path>, K: AsRef<Path>, V: AsRef<[u8]>, F: IntoIterator<Item=(K,V)
         util::command(&up, "git", ["commit", "-m", "(3) Second upstream commit"].iter())?;
         util::command(&up, "git", ["push"].iter())?;
 
+        thread::sleep(Duration::new(3,0));
 
         util::command(&local, "git", ["pull"].iter())?;
     };

@@ -168,19 +168,19 @@ impl<'a> Copier<'a> {
         dest_parent_commit_shas.iter().for_each(|v| debug!("Dest commit parent: {}", v));
         let dest_parent_commits: Vec<Commit> = dest_parent_commit_shas
             .iter()
-            .map(|parent_sha| self.dest.bare.find_commit(*parent_sha).unwrap())
+            .map(|parent_sha| self.dest.working.find_commit(*parent_sha).unwrap())
             .collect();
 
         // Checkout the first dest parent
         let new_dest_head = *dest_parent_commit_shas.get(0).unwrap();
-        self.dest.working.set_head_detached(new_dest_head);
+        self.dest.working.set_head_detached(new_dest_head).unwrap();
         debug!("Checked out the first parent");
         self.dest
             .working
             .checkout_head(Some(CheckoutBuilder::new().force()))
             .unwrap();
         info!("Set head to {}", new_dest_head);
-        
+
         let n : Vec<&str> = vec!();
         ::util::command_raw(self.source.workdir(), "ls", n.iter()).ok().map(|v|
             trace!("Source files: {}", String::from_utf8(v.stdout).unwrap())

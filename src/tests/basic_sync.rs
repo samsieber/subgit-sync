@@ -12,31 +12,24 @@ use std;
 use super::test_util::*;
 use super::single_branch_basic::run_basic_branch_test;
 
-fn run_basic() -> Res<()> {
+#[test]
+fn modify_modify_modify() {
     let data = vec![
         hashmap!{ "sub/testing" => "This is another test. Yaya."},
         hashmap!{ "testing" => "Overwritten in local"},
         hashmap!{ "sub/testing" => "Overwritten in upstream" },
         ];
 
-    run_basic_branch_test( &test_dir("test_basic"), data)
+    run_basic_branch_test( &test_dir("modify_modify_modify"), data).unwrap();
 }
 
-fn run_basic_2() -> Res<()> {
+#[test]
+fn add_new_in_subgit_modify_upstream() {
     let data = vec![
         hashmap!{ "sub/testing.txt" => "This is another test. Yaya.", "sub/hello.txt" => "Hello world"},
         hashmap!{ "testing" => "New in local"},
         hashmap!{ "sub/testing" => "Overwritten in upstream", "sub/new.txt" => "Hello again" },
     ];
 
-    run_basic_branch_test( &test_dir("test_basic_2"), data)
-}
-#[test]
-fn test_push_from_local_then_pull_upstream_1(){
-    assert_works(run_basic);
-}
-
-#[test]
-fn test_push_from_local_then_pull_upstream_2(){
-    assert_works(run_basic_2);
+    run_basic_branch_test( &test_dir("add_new_in_subgit_modify_upstream"), data).unwrap();
 }
