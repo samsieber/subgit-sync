@@ -27,6 +27,7 @@ pub struct TestWrapper {
     downstream_sub_path: PathBuf,
 }
 
+#[derive(Debug, Clone)]
 pub struct ExtGit {
     path: PathBuf,
 }
@@ -37,6 +38,13 @@ pub enum GitType {
 }
 
 impl TestWrapper {
+    pub fn get_subgit(&self) -> ExtGit{
+        self.downstream.clone()
+    }
+    pub fn get_upstream(&self) -> ExtGit{
+        self.upstream.clone()
+    }
+
     pub fn do_then_verify<D: FnOnce(&ExtGit, &ExtGit) -> Result<(), Box<Error>>>(&self, doer: D) {
         let res = doer(&self.upstream, &self.downstream);
         res.unwrap();
@@ -168,9 +176,13 @@ impl ExtGit {
         util::command(&self.path, "git", args.iter())
     }
 
-    pub fn commit_count<S: AsRef<str>>(&self, commit_ish: S) -> GitResult {
+    pub fn commit_count<S: AsRef<str>>(&self, commit_ish: S) -> Result<u32, Box<Error>> {
         let mut args = vec!["rev-list", "--count", &commit_ish.as_ref()];
-        util::command(&self.path, "git", args.iter())
+        let command_res = util::command_raw(&self.path, "git", args.iter())?;
+        let res_out = String::from_utf8((command_res).stdout).unwrap();
+        println!("--{}--", res_out);
+        //Ok( String::from_utf8(command_res.stdout).unwrap())?.parse().unwrap())
+        Ok(res_out.trim().parse()?)
     }
 }
 

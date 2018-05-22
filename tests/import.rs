@@ -194,9 +194,9 @@ pub fn import_merged_na_na() {
 
 #[test]
 pub fn import_merged_a_na() {
-    TestWrapper::new("import_merged_a_na", |upstream| {
+    let test = TestWrapper::new("import_merged_a_na", |upstream| {
         upstream.update_working(vec![
-            FileAction::overwrite("sub/hello.txt", "Not applicable"),
+            FileAction::overwrite("sub/hello.txt", "Applicable"),
         ]);
         upstream.add(".").unwrap();
         upstream.commit("First Commit from Upstream").unwrap();
@@ -204,7 +204,7 @@ pub fn import_merged_a_na() {
         upstream.checkout_adv(["--orphan", "orphaned"]).unwrap();
         upstream.update_working(vec![
             FileAction::remove("sub/hello.txt"),
-            FileAction::overwrite("again.txt", "Also Not Applicable"),
+            FileAction::overwrite("again.txt", "Not Applicable"),
         ]);
         upstream.add(".").unwrap();
         upstream.commit("Second Commit from Upstream").unwrap();
@@ -213,6 +213,34 @@ pub fn import_merged_a_na() {
         upstream.merge(["orphaned"]).unwrap();
         upstream.push().unwrap();
     }, "sub").unwrap();
+
+    assert_eq!(test.get_subgit().commit_count("master").unwrap(), 2);
+}
+
+
+#[test]
+pub fn import_merged_na_a() {
+    let test = TestWrapper::new("import_merged_na_a", |upstream| {
+        upstream.update_working(vec![
+            FileAction::overwrite("hello.txt", "Not applicable"),
+        ]);
+        upstream.add(".").unwrap();
+        upstream.commit("First Commit from Upstream").unwrap();
+
+        upstream.checkout_adv(["--orphan", "orphaned"]).unwrap();
+        upstream.update_working(vec![
+            FileAction::remove("hello.txt"),
+            FileAction::overwrite("sub/again.txt", "Applicable"),
+        ]);
+        upstream.add(".").unwrap();
+        upstream.commit("Second Commit from Upstream").unwrap();
+
+        upstream.checkout("master").unwrap();
+        upstream.merge(["orphaned"]).unwrap();
+        upstream.push().unwrap();
+    }, "sub").unwrap();
+
+    assert_eq!(test.get_subgit().commit_count("master").unwrap(), 2);
 }
 
 #[test]

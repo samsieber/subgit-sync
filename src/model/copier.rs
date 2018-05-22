@@ -103,6 +103,12 @@ impl<'a> Copier<'a> {
             .unwrap()
     }
 
+    pub fn get_source_sha(&'a self, dest_sha: &Oid) -> Oid {
+        self.mapper
+            .get_translated(Some(*dest_sha), self.dest.name, self.source.name)
+            .unwrap()
+    }
+
     pub fn copy_ref_unchecked(
         &'a self,
         ref_name: &str,
@@ -155,16 +161,29 @@ impl<'a> Copier<'a> {
         let source_parent_shas: Vec<Oid> = source_commit.parent_ids().collect();
         source_parent_shas.iter().for_each(|v| debug!("Source commit parent: {}", v));
 
-        // Get the dest parents  - use the empty commit as a parent if there would be not parents otherwise
+        // Get the dest parents
         let mut dest_parent_commit_shas = source_parent_shas
             .iter()
             .map(|parent_sha| self.get_dest_sha(parent_sha))
             .collect();
         dedup_vec(&mut dest_parent_commit_shas);
+        // use the empty commit as a parent if there would be not parents otherwise
         if dest_parent_commit_shas.is_empty() {
             debug!("Adding empty commit as dest commit parent");
             dest_parent_commit_shas.push(self.empty_sha());
         }
+
+        // Turn merges into fast-forwards where possible
+        if dest_parent_commit_shas.len() == 2 {
+            let first = dest_parent_commit_shas[0];
+            let second = dest_parent_commit_shas[1];
+            if self.dest.working.graph_descendant_of(first, second).unwrap() {
+                dest_parent_commit_shas = vec![first];
+            } else if self.dest.working.graph_descendant_of(second, first).unwrap() {
+                dest_parent_commit_shas = vec![second]
+            }
+        }
+
         dest_parent_commit_shas.iter().for_each(|v| debug!("Dest commit parent: {}", v));
         let dest_parent_commits: Vec<Commit> = dest_parent_commit_shas
             .iter()
@@ -196,9 +215,16 @@ impl<'a> Copier<'a> {
         );
 
         info!("\nCopying {}, {:?}", source_sha, source_parent_shas);
-        let source_parent_tree = source_parent_shas
-            .first()
-            .map(|sha| self.source.bare.find_commit(*sha).unwrap().tree().unwrap());
+        let source_parent_tree = if source_parent_shas.len() > 1 {
+            dest_parent_commit_shas
+                .first()
+                .map(|dest_parent_sha| self.get_source_sha(dest_parent_sha))
+        } else {
+            source_parent_shas
+                .first()
+                .map(|v| *v)
+        }.map(|sha| self.source.bare.find_commit(sha).unwrap().tree().unwrap());
+
         let diff = self.source
             .bare
             .diff_tree_to_tree(
