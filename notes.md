@@ -5,13 +5,11 @@ Logging Setup Needs:
  * Catch and record backtraces?
 
 Tests Needed:
- * Unit tests (Notation: A = Applicable, NA = Non-applicable e.g. doesn't need copying to subgit)
+ * Narrow tests (Notation: A = Applicable, NA = Non-applicable e.g. doesn't need copying to subgit)
     * Running setup against a single branch with multiple commits
-    * Subgit: Pushing one commit to an existing tip
     * Subgit: Pushing a new tip pointing to an already imported commit 
     * Subgit: Pushing multiple commits on a single tip
     * Subgit: Pushing multiple tips
-    * Subgit: Pushing orphaned commit
     * Subgit: Push tag
     * Subgit: Push signed commit
     * Upstream: Single non-applicable commit is squashed into parent

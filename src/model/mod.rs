@@ -290,7 +290,7 @@ impl WrappedSubGit {
                 upstream_bare.find_commit(git::find_earliest_commit(&upstream_bare))?;
             debug!("Found earliest commit!");
             {
-                let new_empty_base_commit = git::commit_empty(
+                git::commit_empty(
                     &mirror_working,
                     "refs/sync/empty",
                     &earliest_commit.author(),
@@ -299,10 +299,10 @@ impl WrappedSubGit {
                     &vec![],
                 )?;
                 mirror_working.set_head("refs/sync/empty")?;
-                git::push_sha_ext(&mirror_working, new_empty_base_commit, "refs/sync/empty", None)?;
+                git::push_sha_ext(&mirror_working, "refs/sync/empty", None)?;
             }
             if upstream_working.find_reference("refs/sync/empty").is_err() {
-                let new_empty_base_commit = git::commit_empty(
+                git::commit_empty(
                     &upstream_working,
                     "refs/sync/empty",
                     &earliest_commit.author(),
@@ -311,7 +311,7 @@ impl WrappedSubGit {
                     &vec![],
                 )?;
                 mirror_working.set_head("refs/sync/empty")?;
-                git::push_sha_ext(&upstream_working, new_empty_base_commit, "refs/sync/empty", None)?;
+                git::push_sha_ext(&upstream_working, "refs/sync/empty", None)?;
             }
         }
 

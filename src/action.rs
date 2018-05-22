@@ -93,7 +93,7 @@ impl RequestSync {
             .arg("sync-refs")
             .spawn()
             .unwrap();
-        child.stdin.as_mut().expect("Could not get stdin for child sync-refs child process").write_all(&self.stdin);
+        child.stdin.as_mut().expect("Could not get stdin for child sync-refs child process").write_all(&self.stdin).unwrap();
         Ok(())
     }
 }

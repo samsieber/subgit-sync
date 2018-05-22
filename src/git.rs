@@ -97,7 +97,7 @@ pub fn fetch_all_ext(repo: &Repository) -> Result<(), Box<Error>> {
     Ok(())
 }
 
-pub fn push_sha_ext<S: AsRef<str>>(repo: &Repository, sha: Oid, ref_name: S, git_push_options: Option<Vec<String>>) -> Result<(), Box<Error>> {
+pub fn push_sha_ext<S: AsRef<str>>(repo: &Repository, ref_name: S, git_push_options: Option<Vec<String>>) -> Result<(), Box<Error>> {
     let mut process = std::process::Command::new("git");
     process
         .env_clear()

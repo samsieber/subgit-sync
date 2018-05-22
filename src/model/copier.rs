@@ -138,7 +138,7 @@ impl<'a> Copier<'a> {
         debug!("Copied commits - now copying branch");
         let new_sha = self.get_dest_sha(&new_source_sha.unwrap());
 
-        let res = git::push_sha_ext(&self.dest.working, new_sha, ref_name, git_push_opts);
+        let res = git::push_sha_ext(&self.dest.working, ref_name, git_push_opts);
 
         match &res {
             Ok(_) => (),
@@ -185,10 +185,6 @@ impl<'a> Copier<'a> {
         }
 
         dest_parent_commit_shas.iter().for_each(|v| debug!("Dest commit parent: {}", v));
-        let dest_parent_commits: Vec<Commit> = dest_parent_commit_shas
-            .iter()
-            .map(|parent_sha| self.dest.working.find_commit(*parent_sha).unwrap())
-            .collect();
 
         // Checkout the first dest parent
         let new_dest_head = *dest_parent_commit_shas.get(0).unwrap();
