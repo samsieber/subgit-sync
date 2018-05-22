@@ -1,17 +1,15 @@
 # SubGit RS [WIP]
 
-**Note: WIP - at this point, *only the initial synchronization is implemented* - no hooks have been implemented and it hasn't been well tested.**
-
 Subgit lets you publish a subdirectory in a git repository as it's own synchronized git repository
 without requiring the use of git submodules or git subtrees. It uses a couple of server-side hooks instead.
 
-Under the hood, it uses a pre-recieve commit on the republished side
- to make sure that commits are propagated to the upstream repository (the source). 
-It also places an post-update hook into the upstream repository to aid the push experience in the sub git.
-
-The current design requires both repositories to be on the same file system (some sym-linking is used).
-
-When completed, someone with access to file system backing the repos will be able to clone this repo and run a single cargo command from it to run the setup & place the hooks.
+Under the hood, it is a single binary three distinct functions:
+  * It can run the setup and initial synchronization, copying itself to into the subgit and upstream repositories in the appropriate locations
+  * Can act as the update hook in the subgit repository
+  * Can act as the post-receive hook in the upstream hook
+  
+And example invocation of the program would be `subgit-rs some/upstream/repo.git target/subgit.git dir/to/republish`, 
+which would setup the `target/subgit.git` to be a synchronized copy of the `dir/to/republish` folder from the `some/upstream/repo.git` repository.
 
 ## Synchronization Logic
 
@@ -97,42 +95,8 @@ To translate a commit from one repository to the other, the following logic is u
  Given a sha, one can look up the corresponding upstream or mirror file which contains the sha it maps to in the other repository.
  It's a repo so that if we run into errors while copying commits, we can reset the state back to the HEAD.
  
- ## To Do
- * Implement setup for new args mode
-    * Setup
-        * Runs the setup
-            * Need to add a empty ref upstream too (if it doesn't exist)
-        * Copies itself as the pre-receive and then symlinks itself as the post update script
-        * Runs the sync all
-        * Maybe add a way to symlink the pre-receive too?
-    * Sync all
-        * Syncs each ref that exists upstream
-        * Removes refs that don't exist upstream
-    * Sync branch
-        * Sync or remove the branch
-    * Precommit Hook
-        * Read the branch info from the stdin
-        * Sync to upstream
-        * Push - rollback if there's an error
-    * Pass to subgit
-        * Calls the hook in the subgit repo to do the appropriate logic
-            * Might need to set the git_dir variable - do we need one of those?
-            
- * Change locking to lock on setting file
- * Have setup place the hook in the data dir, and then symlink from there
-    
- * Setup tests using the post-parsing data
- 
+ ## To Do 
  * Add support for more branches / repos - maybe add a filter in the data file?
- * Add a way to script tests randomly crawling a repo
- 
- * Implement commit sha map & rolling back when pushing fails
  * Create an empty ref in the upstream for orphaned branches in the subgit (so those don't break the script)
- * Write the subgit hook logic
- * Write a command to place the hook in the subg dir
- * Make the hook read the setting from the data dir (log level & perhaps more)
- * Add locking to the hook
- * Implement deleting branches
- * Implement the update hook
- * Wrap everything up nicely in a cargo command that runs the setup & build & places the hook.
+ * Implement many, many tests
   
