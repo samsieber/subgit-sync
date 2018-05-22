@@ -4,8 +4,6 @@ extern crate log;
 extern crate serde_derive;
 #[macro_use]
 extern crate structopt;
-#[macro_use]
-extern crate maplit;
 
 extern crate serde;
 extern crate toml;
@@ -27,12 +25,12 @@ mod cli;
 mod util;
 mod git;
 
-#[cfg(test)]
-mod tests;
-
 pub use logging::setup_logging;
 pub use model::WrappedSubGit;
 pub use util::fork_into_child;
+pub use model::BinSource;
+pub use util::StringError;
+pub use fs::make_absolute;
 
 pub fn run() -> Result<(), Box<Error>> {
     let exec_env = cli::ExecEnv::detect();

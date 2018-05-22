@@ -1,4 +1,4 @@
-use git2::{Commit, Delta, Index, IndexAddOption, ObjectType, Oid, Repository, ResetType, Remote, build::CheckoutBuilder};
+use git2::{Commit, Delta, Index, IndexAddOption, ObjectType, Oid, Repository, build::CheckoutBuilder};
 use super::map::CommitMapper;
 use std::path::{Path, PathBuf};
 use std::fs::OpenOptions;
@@ -195,8 +195,6 @@ impl<'a> Copier<'a> {
             trace!("Dest files: {}", String::from_utf8(v.stdout).unwrap())
         );
 
-        let parent_commit =
-
         info!("\nCopying {}, {:?}", source_sha, source_parent_shas);
         let source_parent_tree = source_parent_shas
             .first()
@@ -280,7 +278,7 @@ impl<'a> Copier<'a> {
         let mut new_dest_sha = new_dest_head;
 
         // Create a new commit if there are changes to record or if its a merge commit in the destination
-        if source_parent_shas.len() > 1 || changes {
+        if dest_parent_commit_shas.len() > 1 || changes {
             let mut index = self.dest.working_index();
             index
                 .add_all(

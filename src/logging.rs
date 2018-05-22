@@ -23,7 +23,7 @@ pub fn configure_logging<P: AsRef<Path>>(
 ) {
     println!("Logging file path: {:?}", &file_path.as_ref().to_string_lossy());
 
-    let mut f = File::create(file_path.as_ref()).unwrap();
+    let f = File::create(file_path.as_ref()).unwrap();
 
     println!("File created");
     CombinedLogger::init(vec![

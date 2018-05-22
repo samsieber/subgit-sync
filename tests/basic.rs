@@ -1,16 +1,15 @@
-use std::path::{PathBuf, Path};
-use std::fs::{remove_dir_all, create_dir_all};
-use util;
-use std::error::Error;
-use fs;
-use model::WrappedSubGit;
-use log::LevelFilter;
-use model::BinSource;
-use simplelog::TermLogger;
-use simplelog::Config;
-use std;
-use super::test_util::*;
-use super::single_branch_basic::run_basic_branch_test;
+#[macro_use]
+extern crate maplit;
+
+extern crate subgit_rs;
+extern crate log;
+extern crate simplelog;
+
+mod util;
+mod harness;
+
+use util::*;
+use harness::*;
 
 #[test]
 fn modify_modify_modify() {
@@ -18,7 +17,7 @@ fn modify_modify_modify() {
         hashmap!{ "sub/testing" => "This is another test. Yaya."},
         hashmap!{ "testing" => "Overwritten in local"},
         hashmap!{ "sub/testing" => "Overwritten in upstream" },
-        ];
+    ];
 
     run_basic_branch_test( &test_dir("modify_modify_modify"), data).unwrap();
 }

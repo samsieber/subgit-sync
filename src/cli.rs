@@ -62,7 +62,6 @@ impl SetupRequest {
 
 impl ExecEnv {
     pub fn detect() -> ExecEnv {
-        let args: Vec<_> = env::args().collect();
         let git_os_dir = env::var_os("GIT_DIR");
 
         println!("Current Path: {:?}, Current Git DIR: {:?}", env::current_exe().unwrap(), git_os_dir);

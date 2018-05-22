@@ -1,16 +1,16 @@
 use std::path::PathBuf;
 use std::path::Path;
 use std;
-use util;
 use std::error::Error;
-use tests::test_util;
-use WrappedSubGit;
+use subgit_rs::{WrappedSubGit, BinSource};
 use log::LevelFilter;
-use model::BinSource;
-use tests::test_util::clone;
-use tests::test_util::set_credentials;
 use std::time::Duration;
 use std::thread::sleep;
+use simplelog::TermLogger;
+use simplelog::Config;
+use super::util::*;
+use super::util;
+use std::thread;
 
 // Setup with list of initial commits (generate predictable commit messages if none are given)
 // Do changes & commit
@@ -41,7 +41,7 @@ impl TestWrapper {
         let res = doer(&self.upstream, &self.downstream);
         res.unwrap();
 
-        test_util::assert_dir_content_equal(&self.upstream.path.join(&self.upstream_sub_path), &self.downstream.path.join(&self.downstream_sub_path));
+        assert_dir_content_equal(&self.upstream.path.join(&self.upstream_sub_path), &self.downstream.path.join(&self.downstream_sub_path));
     }
 
     pub fn verify_push_changes_and_pull_in_other(&self, main: GitType, changes: Vec<FileAction>, message: &str){
@@ -69,20 +69,20 @@ impl TestWrapper {
     }
 
     pub fn new<P : AsRef<str>, S: FnOnce(&ExtGit) -> ()>(name: P, setup: S, subgit_eq: &str) -> Result<TestWrapper, Box<Error>> {
-        let root = test_util::test_dir(name.as_ref());
+        let root = test_dir(name.as_ref());
 
         let d: &Path = root.as_ref();
-        let up_bare = test_util::init_bare_repo("upstream.git", &d)?;
-        let up = test_util::clone(&d, &up_bare)?;
+        let up_bare = init_bare_repo("upstream.git", &d)?;
+        let up = clone(&d, &up_bare)?;
 
-        test_util::set_credentials(&up_bare);
-        test_util::set_credentials(&up);
+        set_credentials(&up_bare);
+        set_credentials(&up);
 
         let upstream = ExtGit { path: d.join("upstream") };
 
         setup(&upstream);
 
-        let local_bare = test_util::init_bare_repo("subgit.git", &d)?;
+        let local_bare = init_bare_repo("subgit.git", &d)?;
 
         let wrapped = WrappedSubGit::run_creation(
             &local_bare,
@@ -143,9 +143,38 @@ impl ExtGit {
     pub fn push(&self) -> GitResult {
         util::command(&self.path, "git", ["push"].iter())
     }
+
+    pub fn branch<A: AsRef<str>, P: AsRef<[A]>>(&self, args: P) -> GitResult {
+        let mut args : Vec<&str> = args.as_ref().into_iter().map(|v| v.as_ref()).collect();
+        args.insert(0, "branch");
+        util::command(&self.path, "git", args.iter())
+    }
+
+    pub fn checkout_adv<A: AsRef<str>, P: AsRef<[A]>>(&self, args: P) -> GitResult {
+        let mut args : Vec<&str> = args.as_ref().into_iter().map(|v| v.as_ref()).collect();
+        args.insert(0, "checkout");
+        util::command(&self.path, "git", args.iter())
+    }
+
+    pub fn push_adv<A: AsRef<str>, P: AsRef<[A]>>(&self, args: P) -> GitResult {
+        let mut args : Vec<&str> = args.as_ref().into_iter().map(|v| v.as_ref()).collect();
+        args.insert(0, "push");
+        util::command(&self.path, "git", args.iter())
+    }
+
+    pub fn merge<A: AsRef<str>, P: AsRef<[A]>>(&self, args: P) -> GitResult {
+        let mut args : Vec<&str> = args.as_ref().into_iter().map(|v| v.as_ref()).collect();
+        args.insert(0, "merge");
+        util::command(&self.path, "git", args.iter())
+    }
+
+    pub fn commit_count<S: AsRef<str>>(&self, commit_ish: S) -> GitResult {
+        let mut args = vec!["rev-list", "--count", &commit_ish.as_ref()];
+        util::command(&self.path, "git", args.iter())
+    }
 }
 
-struct Content {
+pub struct Content {
     path: PathBuf,
     content: Vec<u8>,
 }
@@ -163,7 +192,7 @@ impl FileAction{
         })
     }
 
-    pub fn remove <P: AsRef<Path>>(self, path: P) -> Self{
+    pub fn remove <P: AsRef<Path>>(path: P) -> Self{
         FileAction::Remove(path.as_ref().to_owned())
     }
 
@@ -177,3 +206,78 @@ impl FileAction{
         }
     }
 }
+
+
+/* Simpler test harness */
+pub fn run_basic_branch_test<P,K,V,F,I>(root: P, files_collection: I) -> Result<(), Box<Error>>
+where P: AsRef<Path>, K: AsRef<Path>, V: AsRef<[u8]>, F: IntoIterator<Item=(K,V)>, I: IntoIterator<Item=F>
+{
+    let mut files = files_collection.into_iter();
+
+    let _ = TermLogger::init(LevelFilter::Debug, Config::default());
+    let d = root.as_ref();
+    let up_bare = init_bare_repo("test.git", &d)?;
+    let up = clone(&d, &up_bare)?;
+
+    set_credentials(&up_bare);
+    set_credentials(&up);
+
+    {
+        util::write_files(&up, files.next().unwrap())?;
+        util::command(&up, "git", ["add", "."].iter())?;
+        util::command(&up, "git", ["commit", "-m", "(1) First upstream commit"].iter())?;
+        util::command(&up, "git", ["push"].iter())?;
+    };
+    let local_bare = init_bare_repo("local.git", &d)?;
+    let wrapped = WrappedSubGit::run_creation(
+        &local_bare,
+        &up_bare,
+        "sub",
+        None,
+        LevelFilter::Debug,
+        BinSource {
+            location: PathBuf::from("target/debug/hook"),
+            symlink: true,
+        },
+        None,
+        None,
+    )?;
+
+    wrapped.update_all_from_upstream()?;
+
+    let local = clone(&d, &local_bare)?;
+
+    set_credentials(&local_bare);
+    set_credentials(&local);
+
+    assert_dir_content_equal(&local, &up.join("sub"));
+
+    {
+        util::write_files(&local, files.next().unwrap())?;
+
+        util::command(&local, "git", ["add", "."].iter())?;
+        util::command(&local, "git", ["commit", "-m", "(2) First subgit commit"].iter())?;
+        util::command(&local, "git", ["push"].iter())?;
+
+        util::command(&up, "git", ["pull"].iter())?;
+    };
+
+    assert_dir_content_equal(&local, &up.join("sub"));
+
+    {
+        util::write_files(&up, files.next().unwrap())?;
+
+        util::command(&up, "git", ["add", "."].iter())?;
+        util::command(&up, "git", ["commit", "-m", "(3) Second upstream commit"].iter())?;
+        util::command(&up, "git", ["push"].iter())?;
+
+        thread::sleep(Duration::new(3,0));
+
+        util::command(&local, "git", ["pull"].iter())?;
+    };
+
+    assert_dir_content_equal(&local, &up.join("sub"));
+
+    Ok(())
+}
+

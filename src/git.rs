@@ -3,8 +3,6 @@ use git2;
 use std::error::Error;
 use std::path::Path;
 use std;
-use git2::RemoteCallbacks;
-use git2::PushOptions;
 use util::StringError;
 
 pub fn get_git_options() -> Option<Vec<String>> {

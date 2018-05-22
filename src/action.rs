@@ -9,7 +9,6 @@ use std::env;
 use git;
 use std::process::Stdio;
 use std::io::Write;
-use std::ffi::OsString;
 
 pub type RunResult = Result<(), Box<Error>>;
 
@@ -184,7 +183,6 @@ impl Action {
             Action::SyncAll(sync_all) => sync_all.run(),
             Action::SyncRefs(sync_refs) => sync_refs.run(),
             Action::RequestSync(request_sync) => request_sync.run(),
-            _ => panic!("Implementation not finished"),
         }
     }
 }

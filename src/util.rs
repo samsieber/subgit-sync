@@ -37,44 +37,6 @@ impl error::Error for StringError {
     }
 }
 
-pub fn write_files<P, K,V,I>(root: P, files: I) -> Result<(), Box<Error>>
-    where P: AsRef<Path>, K: AsRef<Path>, V: AsRef<[u8]>, I: IntoIterator<Item=(K,V)>
-{
-    let root_dir = root.as_ref();
-
-    for (f, c) in files {
-        std::fs::create_dir_all(root_dir.join(&f).parent().unwrap())?;
-        std::fs::write(root_dir.join(&f), c)?;
-    }
-
-    Ok(())
-}
-
-
-pub fn command<P, C, I, S>(path: P, command: C, args: I) -> Result<(), Box<Error>>
-    where P: AsRef<Path>, C: AsRef<OsStr>, I: IntoIterator<Item=S>, S: AsRef<OsStr>
-{
-    let result = command_raw(path, command, args)?;
-
-    if !result.status.success() {
-        let err_message =format!(
-            "Could not execute command {}. Full command output: \nStd Out:\n{}\nStd Err:\n{}",
-            &result.status,
-            String::from_utf8(result.stdout)?,
-            String::from_utf8(result.stderr)?
-        );
-
-        println!("{}", err_message);
-
-        return Err(Box::new(StringError { message: err_message }));
-    } else {
-        println!("{}", String::from_utf8(result.stdout)?);
-        println!("{}", String::from_utf8(result.stderr)?);
-    }
-
-    Ok(())
-}
-
 pub fn command_raw<P, C, I, S>(path: P, command: C, args: I) -> Result<Output, Box<Error>>
     where P: AsRef<Path>, C: AsRef<OsStr>, I: IntoIterator<Item=S>, S: AsRef<OsStr>
 {
@@ -97,12 +59,12 @@ pub fn command_raw<P, C, I, S>(path: P, command: C, args: I) -> Result<Output, B
 /// Also see https://users.rust-lang.org/t/how-to-close-a-file-descriptor-with-nix/9878
 pub fn fork_into_child() {
     match fork() {
-        Ok(ForkResult::Parent { child, .. }) => {
+        Ok(ForkResult::Parent { child: _child, .. }) => {
             std::process::exit(0);
         }
         Ok(ForkResult::Child) => {
             match fork() {
-                Ok(ForkResult::Parent { child, .. }) => {
+                Ok(ForkResult::Parent { child: _child, .. }) => {
                     std::process::exit(0);
                 }
                 Ok(ForkResult::Child) => {
