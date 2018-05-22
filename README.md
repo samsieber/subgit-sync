@@ -11,6 +11,9 @@ Under the hood, it is a single binary three distinct functions:
 And example invocation of the program would be `subgit-rs some/upstream/repo.git target/subgit.git dir/to/republish`, 
 which would setup the `target/subgit.git` to be a synchronized copy of the `dir/to/republish` folder from the `some/upstream/repo.git` repository.
 
+This project is implemented using the Rust programming language, and it compiles down to a single binary. It uses the 
+libgit2 rust bindings and a few other rust dependencies (logging, command line option parsing, etc).
+
 ## Synchronization Logic
 
 ### General Flow
