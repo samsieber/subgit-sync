@@ -127,6 +127,7 @@ pub fn push_sha_ext<S: AsRef<str>>(repo: &Repository, sha: Oid, ref_name: S, git
 
 pub fn commit_empty(
     repo: &Repository,
+    ref_name: &str,
     author: &Signature,
     committer: &Signature,
     message: &str,
@@ -137,7 +138,7 @@ pub fn commit_empty(
     let new_empty_tree = new_empty_object.as_tree().unwrap();
 
     Ok(repo.commit(
-        Some("HEAD"),
+        Some(ref_name),
         &author,
         &committer,
         &message,
