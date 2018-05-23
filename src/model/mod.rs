@@ -77,8 +77,11 @@ impl WrappedSubGit {
         };
 
         println!("Post option adjustment");
+
         if new == None {
-            self.local_bare.reflog_delete(ref_name.as_ref())?;
+            //git::delete_remote_branch(&self.local_working, &ref_name, None)?;
+            println!("Deleting remote branch");
+            self.export_local_commits(ref_name.as_ref(), old, None);
             return Ok(());
         }
 
@@ -115,7 +118,7 @@ impl WrappedSubGit {
 
         info!("About to export commits");
 
-        self.export_local_commits(ref_name.as_ref(), old, &new_sha);
+        self.export_local_commits(ref_name.as_ref(), old, Some(new_sha));
 
         Ok(())
     }
@@ -125,7 +128,7 @@ impl WrappedSubGit {
         &self,
         ref_name: &str,
         old_local_sha: Option<Oid>,
-        new_local_sha: &Oid,
+        new_local_sha: Option<Oid>,
     ) -> Option<Oid> {
         let mapper = map::CommitMapper { map: &self.map };
         let sha_copier = copier::Copier {
@@ -144,7 +147,7 @@ impl WrappedSubGit {
             mapper: &mapper,
         };
 
-        sha_copier.copy_ref_unchecked(ref_name, old_local_sha, Some(*new_local_sha), Some(vec!("IGNORE_SUBGIT_UPDATE".to_owned())))
+        sha_copier.copy_ref_unchecked(ref_name, old_local_sha, new_local_sha, Some(vec!("IGNORE_SUBGIT_UPDATE".to_owned())))
     }
 
     pub fn import_upstream_commits(

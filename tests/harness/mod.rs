@@ -184,6 +184,12 @@ impl ExtGit {
         //Ok( String::from_utf8(command_res.stdout).unwrap())?.parse().unwrap())
         Ok(res_out.trim().parse()?)
     }
+
+    pub fn command_output(&self, args: Vec<&str>) -> Result<String, Box<Error>> {
+        let command_res = util::command_raw(&self.path, "git", args.iter())?;
+        let res_out = String::from_utf8((command_res).stdout).unwrap();
+        Ok(res_out.trim().to_owned())
+    }
 }
 
 pub struct Content {

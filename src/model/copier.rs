@@ -122,7 +122,7 @@ impl<'a> Copier<'a> {
         }
 
         if new_source_sha == None {
-            self.source.bare.reflog_delete(ref_name.as_ref()).expect("Could not remove reference!");
+            git::delete_remote_branch(self.dest.working, &ref_name,git_push_opts).expect("Could not remove remote reference!");
             return None;
         }
 
