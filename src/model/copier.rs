@@ -130,7 +130,7 @@ impl<'a> Copier<'a> {
             .get_commits_between(old_source_sha, &new_source_sha.unwrap()); //self.get_commits_to_import(old_upstream_sha, new_upstream_sha);
 
         commits.into_iter()
-            .filter(|&oid| !self.mapper.has_sha(&oid, "upstream", "local"))
+            .filter(|&oid| !self.mapper.has_sha(&oid, self.source.name, self.dest.name))
             //.take(20)
             .map(|oid| self.copy_commit(&oid))
             .last();
@@ -195,20 +195,6 @@ impl<'a> Copier<'a> {
             .checkout_head(Some(CheckoutBuilder::new().force()))
             .unwrap();
         info!("Set head to {}", new_dest_head);
-
-        let n : Vec<&str> = vec!();
-        ::util::command_raw(self.source.workdir(), "ls", n.iter()).ok().map(|v|
-            trace!("Source files: {}", String::from_utf8(v.stdout).unwrap())
-        );
-        ::util::command_raw(self.source.workdir(), "ls", ["sub"].iter()).ok().map(|v|
-            trace!("Source files: {}", String::from_utf8(v.stdout).unwrap())
-        );
-        ::util::command_raw(self.dest.workdir(), "ls", n.iter()).ok().map(|v|
-            trace!("Dest files: {}", String::from_utf8(v.stdout).unwrap())
-        );
-        ::util::command_raw(self.dest.workdir(), "ls", ["sub"].iter()).ok().map(|v|
-            trace!("Dest files: {}", String::from_utf8(v.stdout).unwrap())
-        );
 
         info!("\nCopying {}, {:?}", source_sha, source_parent_shas);
         let source_parent_tree = if source_parent_shas.len() > 1 {

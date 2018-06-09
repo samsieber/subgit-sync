@@ -59,7 +59,7 @@ pub fn push_orphaned_commit() {
         downstream.checkout_adv(["--orphan", "orphaned"]).unwrap();
         downstream.update_working(vec![FileAction::overwrite("testing.txt", "Applicable")]);
         downstream.add(".").unwrap();
-        downstream.commit("First Commit from Upstream").unwrap();
+        downstream.commit("First Commit from orphaned downstream").unwrap();
         downstream.push_adv(["-u", "origin", "orphaned"]).unwrap();
 
         std::thread::sleep(Duration::new(2,0));
@@ -84,8 +84,19 @@ pub fn push_new_tip_with_existing_sha() {
         upstream.pull().unwrap();
         upstream.checkout("second").unwrap();
 
+        assert_eq!(
+            downstream.command_output(vec!["rev-parse", "second"]).unwrap(),
+            downstream.command_output(vec!["rev-parse", "master"]).unwrap()
+        );
+
+        assert_eq!(
+            upstream.command_output(vec!["rev-parse", "second"]).unwrap(),
+            upstream.command_output(vec!["rev-parse", "master"]).unwrap()
+        );
+
         Ok(())
-    })
+    });
+
 }
 
 #[test]
@@ -150,6 +161,35 @@ pub fn push_new_tips_with_new_shas() {
 }
 
 #[test]
+pub fn push_existing_on_master(){
+    let test = base("push_existing_on_master");
+
+    test.do_then_verify(|upstream, downstream| {
+        downstream.checkout_adv(["-b", "second"]).unwrap();
+
+        downstream.update_working(vec![FileAction::overwrite("second.txt", "sec")]);
+        downstream.add(".").unwrap();
+        downstream.commit("Commit from second branch").unwrap();
+
+        downstream.push_adv(["origin", "second:second"]).unwrap();
+
+        upstream.pull().unwrap();
+        upstream.checkout("second").unwrap();
+
+        Ok(())
+    });
+
+    test.do_then_verify(|upstream, downstream| {
+        downstream.push_adv(["origin", "second:master"]).unwrap();
+
+        upstream.checkout("master").unwrap();
+        upstream.pull().unwrap();
+
+        Ok(())
+    });
+}
+
+#[test]
 pub fn push_and_then_delete_branch() {
     let test = base("push_and_then_delete_branch");
 
@@ -167,7 +207,7 @@ pub fn push_and_then_delete_branch() {
     });
 
     test.do_then_verify(|upstream, downstream| {
-        downstream.push_adv(["origin", ":second"]);
+        downstream.push_adv(["origin", ":second"]).unwrap();
         assert_eq!("", downstream.command_output(vec!["ls-remote", "--heads", "origin", "second"]).unwrap());
 
         upstream.command_output(vec!["fetch", "--all"]).unwrap();
