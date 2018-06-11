@@ -184,14 +184,14 @@ impl WrappedSubGit {
         let mut local_refs: std::collections::HashMap<String, git2::Oid> =
             git::get_refs(&self.local_bare, "**")?
                 .into_iter()
-                .filter(|&(ref name, ref _target)| git::is_not_tag(&name))
+                .filter(|&(ref name, ref _target)| git::is_applicable(&name))
                 .collect();
 
         let mapper = map::CommitMapper { map: &self.map };
 
         git::get_refs(&self.upstream_bare, "**")?
             .into_iter()
-            .filter(|&(ref name, ref _target)| git::is_not_tag(&name))
+            .filter(|&(ref name, ref _target)| git::is_applicable(&name))
             .for_each(|(ref_name, upstream_sha)| {
                 info!("Importing {}", ref_name);
                 let local_sha = local_refs.remove(&ref_name);

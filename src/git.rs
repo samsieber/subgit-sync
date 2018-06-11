@@ -188,16 +188,15 @@ pub fn commit_empty(
     message: &str,
     parents: &[&Commit],
 ) -> Result<Oid, Box<Error>> {
-    let new_empty_index_oid = repo.index()?.write_tree()?;
-    let new_empty_object = repo.find_object(new_empty_index_oid, Some(ObjectType::Tree))?;
-    let new_empty_tree = new_empty_object.as_tree().unwrap();
+    let new_empty_tree_oid = repo.treebuilder(None)?.write()?;
+    let new_empty_tree = repo.find_tree(new_empty_tree_oid)?;
 
     Ok(repo.commit(
         Some(ref_name),
         &author,
         &committer,
         &message,
-        new_empty_tree,
+        &new_empty_tree,
         &parents,
     )?)
 }
@@ -215,7 +214,7 @@ pub fn get_refs(repo: &Repository, glob: &str) -> Result<Vec<(String, Oid)>, Box
     ref_list
 }
 
-pub fn is_not_tag<S: AsRef<str>>(value: &S) -> bool {
-    //value.as_ref().starts_with("refs/heads") || value.as_ref() == "HEAD"
-    !value.as_ref().starts_with("refs/tags")
+pub fn is_applicable<S: AsRef<str>>(value: &S) -> bool {
+    value.as_ref().starts_with("refs/heads") || value.as_ref() == "HEAD"
+//    !value.as_ref().starts_with("refs/tags")
 }
