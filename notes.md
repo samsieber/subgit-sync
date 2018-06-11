@@ -3,6 +3,14 @@ Logging Setup Needs:
  * Record what changes are being made (e.g. upstream call or subgit call, & the refs being updated)
  * Record aborts due to being out of date
  * Catch and record backtraces?
+ 
+Things to do:
+ * Filter refs for pushes
+ * Lock on something other than the hook (for upgrades!)
+ * Place lock file and lock before placing hook during setup
+ * Add option for easy overwriting of hook
+ * Disable GC in working repos
+ * Remove old refs during sync-all
 
 Tests Needed:
  * Narrow tests (Notation: A = Applicable, NA = Non-applicable e.g. doesn't need copying to subgit)
