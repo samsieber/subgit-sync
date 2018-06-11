@@ -17,6 +17,7 @@ use model::map::CommitMapper;
 use simplelog::WriteLogger;
 use simplelog::Config;
 use std::fs::File;
+use action::lock;
 
 pub struct WrappedSubGit {
     pub location: PathBuf,
@@ -37,22 +38,22 @@ pub struct BinSource {
 impl WrappedSubGit {
     pub fn open<SP: AsRef<Path>>(subgit_location: SP) -> Result<WrappedSubGit, Box<Error>> {
         let subgit_top_path: &Path = subgit_location.as_ref();
-        let subgit_path = subgit_top_path.join("data");
+        let subgit_data_path = subgit_top_path.join("data");
         println!("Loading settings");
-        let git_settings = settings::Settings::load(&subgit_path);
+        let git_settings = settings::Settings::load(&subgit_data_path);
         println!("Loaded settings");
 
         git_settings.setup_logging();
         println!("Setup logging");
 
         Ok(WrappedSubGit {
-            location: subgit_path.to_owned(),
-            map: Repository::open(subgit_path.join("map")).expect("Cannot find map file"),
-            upstream_working: Repository::open(subgit_path.join("upstream"))?,
-            upstream_bare: Repository::open(subgit_path.join("upstream.git"))?,
+            location: subgit_top_path.to_owned(),
+            map: Repository::open(subgit_data_path.join("map")).expect("Cannot find map file"),
+            upstream_working: Repository::open(subgit_data_path.join("upstream"))?,
+            upstream_bare: Repository::open(subgit_data_path.join("upstream.git"))?,
             upstream_path: git_settings.upstream_path(),
-            local_working: Repository::open(subgit_path.join("local"))?,
-            local_bare: Repository::open(subgit_path.join("local.git"))?,
+            local_working: Repository::open(subgit_data_path.join("local"))?,
+            local_bare: Repository::open(subgit_data_path.join("local.git"))?,
             local_path: git_settings.local_path(),
         })
     }
@@ -351,6 +352,11 @@ impl WrappedSubGit {
             subgit_map_path.unwrap_or("").to_owned(),
             log_level,
         );
+
+        info!("Generating lock file");
+        { File::create(&subgit_data_path.join("lock"))?; }
+        info!("Preparing to lock");
+        lock(&subgit_location)?;
 
         info!("Copying hook file");
         let hook_path = subgit_location.as_ref().join("data").join("hook");

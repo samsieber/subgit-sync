@@ -6,8 +6,6 @@ Logging Setup Needs:
  
 Things to do:
  * Filter refs for pushes
- * Lock on something other than the hook (for upgrades!)
- * Place lock file and lock before placing hook during setup
  * Add option for easy overwriting of hook
  * Disable GC in working repos
  * Remove old refs during sync-all

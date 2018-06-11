@@ -83,7 +83,6 @@ impl<'a> Copier<'a> {
                 .get_commits_between(vec!(starting_sha), dest_sha_inclusive)
         } else {
             let starting_shas = git::get_n_recent_shas(self.dest.bare, 10).iter().map(|sha| self.get_source_sha(sha)).collect();
-            println!("{:?}", &starting_shas);
             self.source
                 .get_commits_between(starting_shas, dest_sha_inclusive)
         }

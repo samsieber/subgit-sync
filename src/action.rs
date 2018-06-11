@@ -9,6 +9,7 @@ use std::env;
 use git;
 use std::process::Stdio;
 use std::io::Write;
+use std::path::Path;
 
 pub type RunResult = Result<(), Box<Error>>;
 
@@ -99,6 +100,14 @@ impl RequestSync {
     }
 }
 
+pub fn lock<P: AsRef<Path>>(root: P) -> RunResult{
+    info!("Trying to lock on {:?}", ::fs::make_absolute(&root.as_ref().join("data/lock")));
+    let file = File::open(root.as_ref().join("data/lock"))?;
+    file.lock_exclusive()?;
+    info!("Locked!");
+    Ok(())
+}
+
 impl Setup {
     fn run(self) -> RunResult {
         let subgit_map_path = self.subgit_map_path
@@ -127,11 +136,8 @@ impl UpdateHook {
     pub fn run(self) -> RunResult {
         let wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
 
-        info!("Opened wrapped");
-        info!("Trying to lock on {:?}", ::fs::make_absolute(wrapped.location.join("hook")));
-        let file = File::open(wrapped.location.join("hook"))?;
-        file.lock_exclusive()?;
-        info!("Locked!");
+        info!("Opened Wrapped");
+        lock(&wrapped.location)?;
         info!("Running update");
         wrapped.update_self();
         wrapped.push_ref_change_upstream(self.ref_name, self.old_sha, self.new_sha)?;
@@ -144,8 +150,10 @@ impl UpdateHook {
 impl SyncAll {
     pub fn run(self) -> RunResult {
         let wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
-        let file = File::open(wrapped.location.join("hook"))?;
-        file.lock_exclusive()?;
+
+        info!("Opened Wrapped");
+        lock(&wrapped.location)?;
+        info!("Running Sync All");
 
         wrapped.update_self();
         wrapped.update_all_from_upstream()?;
@@ -159,8 +167,10 @@ impl SyncRefs {
         super::util::fork_into_child();
 
         let wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
-        let file = File::open(wrapped.location.join("hook"))?;
-        file.lock_exclusive()?;
+
+        info!("Opened Wrapped");
+        lock(&wrapped.location)?;
+        info!("Running Sync Refs");
 
         wrapped.update_self();
         for request in self.requests {
