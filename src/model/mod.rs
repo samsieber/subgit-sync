@@ -270,6 +270,7 @@ impl WrappedSubGit {
             &upstream_path_abs.to_string_lossy(),
             subgit_data_path.join("upstream"),
         )?;
+        git::disable_gc(&upstream_working);
 
         info!("Creating mirror bare access (using symlinks, but excluding hooks)");
         let mirror_raw_path = subgit_data_path.join("local.git");
@@ -298,6 +299,7 @@ impl WrappedSubGit {
             &mirror_raw_path.to_string_lossy(),
             subgit_data_path.join("local"),
         )?;
+        git::disable_gc(&mirror_working);
 
         info!("Adding general purpose empty commit in mirror working directory and upstream working directory");
         let upstream_bare = Repository::open_bare(subgit_data_path.join("upstream.git"))?;

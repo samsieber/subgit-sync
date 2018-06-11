@@ -61,6 +61,13 @@ pub fn open_or_clone_bare<P: AsRef<Path>>(path: P, url: &str) -> Repository {
     }
 }
 
+pub fn disable_gc(repo: &Repository) {
+    let mut config = repo.config().unwrap();
+    config.set_str("gc.pruneExpire", "never").unwrap();
+    config.set_str("gc.reflogExpire", "never").unwrap();
+    config.set_i32("gc.auto", 0).unwrap();
+}
+
 pub fn find_earliest_commit(repo: &Repository) -> Oid {
     let walker = &mut repo.revwalk().unwrap();
     walker

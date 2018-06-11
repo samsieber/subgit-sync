@@ -7,7 +7,6 @@ Logging Setup Needs:
 Things to do:
  * Filter refs for pushes
  * Add option for easy overwriting of hook
- * Disable GC in working repos
  * Remove old refs during sync-all
 
 Tests Needed:
