@@ -32,13 +32,20 @@ struct SetupRequest {
 
     // The path mapping
     upstream_map_path: String,
+
+    #[structopt(short = "s", long = "subgit_map_path")]
     subgit_map_path: Option<String>,
 
     // The log level to use
+    #[structopt(short = "l", long = "log_level")]
     log_level: Option<LevelFilter>,
+    #[structopt(short = "f", long = "log_file", parse(from_os_str))]
+    log_file: Option<PathBuf>,
 
     // The hook paths
+    #[structopt(short = "U", long = "upstream_hook_path")]
     upstream_hook_path: Option<String>,
+    #[structopt(short = "S", long = "subgit_hook_path")]
     subgit_hook_path: Option<String>,
 }
 
@@ -53,6 +60,7 @@ impl SetupRequest {
             subgit_map_path: self.subgit_map_path.map(|v| PathBuf::from(v)),
 
             log_level: self.log_level.unwrap_or(LevelFilter::Debug),
+            log_file: self.log_file.unwrap_or(PathBuf::from("git_subgit_setup.log")),
 
             subgit_hook_path: self.subgit_hook_path.map(|v| PathBuf::from(v)),
             upstream_hook_path: self.upstream_hook_path.map(|v| PathBuf::from(v)),
@@ -64,19 +72,19 @@ impl ExecEnv {
     pub fn detect() -> ExecEnv {
         let git_os_dir = env::var_os("GIT_DIR");
 
-        println!("Current Path: {:?}, Current Git DIR: {:?}", env::current_exe().unwrap(), git_os_dir);
+//        println!("Current Path: {:?}, Current Git DIR: {:?}", env::current_exe().unwrap(), git_os_dir);
 
         match git_os_dir {
             Some(git_os_path) => {
                 let git_path = canonicalize(git_os_path).expect("Cannot open the GIT_DIR");
                 if git_path.join("data").join("settings.toml").is_file() {
-                    println!("In subgit repo");
+//                    eprintln!("In subgit repo");
                     ExecEnv::Subgit(SubGitEnv {
                         git_dir: git_path.clone(),
                         hook_path: git_path.join("data").join("hook"),
                     })
                 } else {
-                    println!("In upstream repo");
+//                    eprintln!("In upstream repo");
                     let hook_path = find_subgit_from_hook().expect("Cannot follow symlink");
                     let repo_path = hook_path.parent().unwrap().parent().unwrap();
                     if !repo_path

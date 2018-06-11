@@ -1,20 +1,8 @@
 use std::path::Path;
 use log::LevelFilter;
-use simplelog::{CombinedLogger, Config, TermLogger, WriteLogger};
-use std::fs::File;
+use simplelog::{CombinedLogger, Config, WriteLogger};
 use simplelog::SimpleLogger;
-
-pub fn setup_logging() {
-    CombinedLogger::init(vec![
-        TermLogger::new(LevelFilter::Info, Config::default()).unwrap(),
-        WriteLogger::new(
-            LevelFilter::Debug,
-            Config::default(),
-            File::create("my_rust_binary.log").unwrap(),
-        ),
-    ]).unwrap();
-    debug!("Logging started");
-}
+use std::fs::OpenOptions;
 
 pub fn configure_logging<P: AsRef<Path>>(
     stdout_level: LevelFilter,
@@ -23,7 +11,7 @@ pub fn configure_logging<P: AsRef<Path>>(
 ) {
     println!("Logging file path: {:?}", &file_path.as_ref().to_string_lossy());
 
-    let f = File::create(file_path.as_ref()).unwrap();
+    let f = OpenOptions::new().create(true).append(true).open(file_path.as_ref()).unwrap();
 
     println!("File created");
     CombinedLogger::init(vec![

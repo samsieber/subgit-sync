@@ -97,6 +97,33 @@ pub fn fetch_all_ext(repo: &Repository) -> Result<(), Box<Error>> {
     Ok(())
 }
 
+pub fn get_n_recent_shas(repo: &Repository, n: usize) -> Vec<Oid> {
+    //git log -n %s --all --format=format:%%Hlet mut process = std::process::Command::new("git");
+    let mut process = std::process::Command::new("git");
+    process
+        .env_clear()
+        .env("PATH", std::env::var("PATH").unwrap());
+    process.arg("log");
+    process.arg("-n");
+    process.arg(&format!("{}", n));
+    process.arg("--all");
+    process.arg("--format=format:%H");
+
+    process.current_dir(repo.path());
+
+    debug!("Finding recent commits in {:?}", repo.path());
+
+    let result = process.output().expect("Could not lookup recent commits");
+
+    if !result.status.success() {
+        panic!("Could not fetch all- exit code was {}. Full result of fetch: {}", &result.status, String::from_utf8(result.stderr).unwrap());
+    } else {
+        let full = std::str::from_utf8(&result.stdout).unwrap();
+        let oids = full.trim();
+        oids.split('\n').map(|v| Oid::from_str(v).unwrap()).collect()
+    }
+}
+
 pub fn push_sha_ext<S: AsRef<str>>(repo: &Repository, ref_name: S, git_push_options: Option<Vec<String>>) -> Result<(), Box<Error>> {
     let mut process = std::process::Command::new("git");
     process
@@ -114,7 +141,7 @@ pub fn push_sha_ext<S: AsRef<str>>(repo: &Repository, ref_name: S, git_push_opti
 
     process.current_dir(repo.workdir().unwrap());
 
-    println!("Pushing from {:?}", repo.workdir());
+    info!("Pushing from {:?}", repo.workdir());
 
     let result = process.output()?;
 

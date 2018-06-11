@@ -25,7 +25,6 @@ mod cli;
 mod util;
 mod git;
 
-pub use logging::setup_logging;
 pub use model::WrappedSubGit;
 pub use util::fork_into_child;
 pub use model::BinSource;

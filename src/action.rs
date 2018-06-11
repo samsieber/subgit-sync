@@ -51,6 +51,7 @@ pub struct Setup {
 
     // The log level to use
     pub log_level: LevelFilter,
+    pub log_file: PathBuf,
 
     // The hook paths
     pub upstream_hook_path: Option<PathBuf>,
@@ -108,6 +109,7 @@ impl Setup {
             self.upstream_map_path.to_str().unwrap(),
             subgit_map_path.as_ref().map(String::as_str),
             self.log_level,
+            self.log_file,
             ::model::BinSource {
                 location: self.copy_from,
                 symlink: false,
@@ -117,21 +119,20 @@ impl Setup {
         )?;
         wrapped.update_all_from_upstream()?;
 
-        panic!("Implementation not finished yet");
+        Ok(())
     }
 }
 
 impl UpdateHook {
     pub fn run(self) -> RunResult {
-        println!("Running update");
-        println!("Trying to open wrapped git: {:?}", ::fs::make_absolute(&self.env.git_dir));
         let wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
 
-        println!("Opened wrapped");
-        println!("Trying to lock on {:?}", ::fs::make_absolute(wrapped.location.join("hook")));
+        info!("Opened wrapped");
+        info!("Trying to lock on {:?}", ::fs::make_absolute(wrapped.location.join("hook")));
         let file = File::open(wrapped.location.join("hook"))?;
         file.lock_exclusive()?;
-        println!("Locked!");
+        info!("Locked!");
+        info!("Running update");
         wrapped.update_self();
         wrapped.push_ref_change_upstream(self.ref_name, self.old_sha, self.new_sha)?;
 
@@ -176,7 +177,7 @@ impl SyncRefs {
 
 impl Action {
     pub fn run(self) -> RunResult {
-        println!("Running action: {:?}", &self);
+//        println!("Running action: {:?}", &self);
         match self {
             Action::Setup(setup) => setup.run(),
             Action::UpdateHook(update) => update.run(),

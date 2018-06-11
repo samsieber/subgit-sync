@@ -1,4 +1,4 @@
-use git2::{Commit, Delta, Index, IndexAddOption, ObjectType, Oid, Repository, build::CheckoutBuilder};
+use git2::{Commit, Delta, Index, IndexAddOption, ObjectType, Oid, Repository, build::CheckoutBuilder, ResetType};
 use super::map::CommitMapper;
 use std::path::{Path, PathBuf};
 use std::fs::OpenOptions;
@@ -32,14 +32,11 @@ impl<'a> GitLocation<'a> {
 
     pub fn get_commits_between(
         &self,
-        maybe_starting_sha: Option<Oid>,
+        starting_shas: Vec<Oid>,
         dest_sha_inclusive: &Oid,
     ) -> Vec<Oid> {
-        debug!("Finding commits in {} between {:?} and {:?}", self.bare.path().to_string_lossy(), maybe_starting_sha, dest_sha_inclusive);
         let walker = &mut self.bare.revwalk().unwrap();
-        if let Some(starting_sha) = maybe_starting_sha {
-            walker.hide(starting_sha).unwrap();
-        }
+        starting_shas.into_iter().for_each(|starting_sha| walker.hide(starting_sha).unwrap());
         walker.push(*dest_sha_inclusive).unwrap();
         walker.set_sorting(git::reverse_topological());
         let res: Result<Vec<Oid>, _> = walker.collect();
@@ -74,6 +71,24 @@ fn dedup_vec<Item: Eq>(items: &mut Vec<Item>) {
 }
 
 impl<'a> Copier<'a> {
+
+    pub fn get_unseen_source_commits_between(
+        &self,
+        maybe_starting_sha: Option<Oid>,
+        dest_sha_inclusive: &Oid,
+    ) -> Vec<Oid> {
+        debug!("Finding commits in {} between {:?} and {:?}", self.source.bare.path().to_string_lossy(), maybe_starting_sha, dest_sha_inclusive);
+        if let Some(starting_sha) = maybe_starting_sha {
+            self.source
+                .get_commits_between(vec!(starting_sha), dest_sha_inclusive)
+        } else {
+            let starting_shas = git::get_n_recent_shas(self.dest.bare, 10).iter().map(|sha| self.get_source_sha(sha)).collect();
+            println!("{:?}", &starting_shas);
+            self.source
+                .get_commits_between(starting_shas, dest_sha_inclusive)
+        }
+    }
+
     fn translate(&'a self, path: &Path) -> Option<PathBuf> {
         let chopped = path.strip_prefix(self.source.location).ok();
         chopped.map(|new_path| self.dest.workdir().join(self.dest.location.join(new_path)))
@@ -126,17 +141,33 @@ impl<'a> Copier<'a> {
             return None;
         }
 
-        let commits = self.source
-            .get_commits_between(old_source_sha, &new_source_sha.unwrap()); //self.get_commits_to_import(old_upstream_sha, new_upstream_sha);
+        let commits = self.get_unseen_source_commits_between(old_source_sha, &new_source_sha.unwrap()); //self.get_commits_to_import(old_upstream_sha, new_upstream_sha);
+
+        let total_commits = commits.len();
+        let mut current_commit = 0;
+
+        debug!("Need to import {} commits for {}", &total_commits, &ref_name);
 
         commits.into_iter()
-            .filter(|&oid| !self.mapper.has_sha(&oid, self.source.name, self.dest.name))
+            .filter(|&oid| {
+                current_commit += 1;
+                if !self.mapper.has_sha(&oid, self.source.name, self.dest.name){
+                    debug!("Importing Commit ({}/{})", &current_commit, &total_commits);
+                    true
+                } else {
+                    debug!("Skipping Commit ({}/{}) - already imported", &current_commit, &total_commits);
+                    false
+                }
+            })
             //.take(20)
             .map(|oid| self.copy_commit(&oid))
             .last();
 
         debug!("Copied commits - now copying branch");
         let new_sha = self.get_dest_sha(&new_source_sha.unwrap());
+        self.dest.working.reset(&self.dest.working.find_object(new_sha, None).unwrap(), ResetType::Hard, None).unwrap();
+
+        debug!("Source was {}, now assigning to {} in dest", &new_source_sha.unwrap(), &new_sha);
 
         let res = git::push_sha_ext(&self.dest.working, ref_name, git_push_opts);
 
@@ -196,7 +227,7 @@ impl<'a> Copier<'a> {
             .unwrap();
         info!("Set head to {}", new_dest_head);
 
-        info!("\nCopying {}, {:?}", source_sha, source_parent_shas);
+        info!("Copying {}, {:?}", source_sha, source_parent_shas);
         let source_parent_tree = if source_parent_shas.len() > 1 {
             dest_parent_commit_shas
                 .first()

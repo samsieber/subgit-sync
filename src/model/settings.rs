@@ -55,7 +55,7 @@ impl Settings {
         logging::configure_logging(
             LevelFilter::Debug,
             self.internal.file_log_level,
-            &self.data_dir.join("logs").join("file.log"),
+            &self.data_dir.join("logs").join("sync.log"),
         );
     }
 }

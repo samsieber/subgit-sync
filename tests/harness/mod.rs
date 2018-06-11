@@ -11,6 +11,7 @@ use simplelog::Config;
 use super::util::*;
 use super::util;
 use std::thread;
+use std::process::ExitStatus;
 
 // Setup with list of initial commits (generate predictable commit messages if none are given)
 // Do changes & commit
@@ -92,21 +93,20 @@ impl TestWrapper {
 
         let local_bare = init_bare_repo("subgit.git", &d)?;
 
-        let wrapped = WrappedSubGit::run_creation(
-            &local_bare,
-            &up_bare,
-            "sub",
-            None,
-            LevelFilter::Debug,
-            BinSource {
-                location: PathBuf::from("target/debug/hook"),
-                symlink: true,
-            },
-            None,
-            None,
-        )?;
+        // Run the setup...
+        let mut process = std::process::Command::new("target/debug/subgit-rs");
+        process
+            .env_clear()
+            .env("PATH", std::env::var("PATH").unwrap());
+        process.arg(&up_bare.as_path().to_string_lossy().as_ref());
+        process.arg(&local_bare.as_path().to_string_lossy().as_ref());
+        process.arg("-f");
+        process.arg(&d.join("test_setup.log"));
+        process.arg("sub");
+        process.env("RUST_BACKTRACE", "1");
 
-        wrapped.update_all_from_upstream()?;
+        let res : ExitStatus = process.spawn().unwrap().wait().unwrap();
+        assert!(res.success());
 
         let local = clone(&d, &local_bare)?;
 
@@ -247,21 +247,25 @@ where P: AsRef<Path>, K: AsRef<Path>, V: AsRef<[u8]>, F: IntoIterator<Item=(K,V)
         util::command(&up, "git", ["push"].iter())?;
     };
     let local_bare = init_bare_repo("local.git", &d)?;
-    let wrapped = WrappedSubGit::run_creation(
-        &local_bare,
-        &up_bare,
-        "sub",
-        None,
-        LevelFilter::Debug,
-        BinSource {
-            location: PathBuf::from("target/debug/hook"),
-            symlink: true,
-        },
-        None,
-        None,
-    )?;
 
-    wrapped.update_all_from_upstream()?;
+    // Run the setup...
+    let mut process = std::process::Command::new("target/debug/subgit-rs");
+    process
+        .env_clear()
+        .env("PATH", std::env::var("PATH").unwrap());
+    process.arg(&up_bare.as_path().to_string_lossy().as_ref());
+    process.arg(&local_bare.as_path().to_string_lossy().as_ref());
+    process.arg("-f");
+    process.arg(&d.join("test_setup.log"));
+    process.arg("sub");
+    process.env("RUST_BACKTRACE", "1");
+
+    let res = process.spawn().unwrap().wait_with_output().unwrap();
+    if !res.status.success() {
+        println!("Setup - STD OUT:\n{}", String::from_utf8(res.stdout).unwrap());
+        println!("Setup - STD ERR:\n{}", String::from_utf8(res.stderr).unwrap());
+        assert!(false);
+    }
 
     let local = clone(&d, &local_bare)?;
 
