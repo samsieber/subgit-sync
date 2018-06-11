@@ -6,7 +6,7 @@ Logging Setup Needs:
 
 Tests Needed:
  * Narrow tests (Notation: A = Applicable, NA = Non-applicable e.g. doesn't need copying to subgit)
-    * Upstream:
+    * Upstream (import & upstream push):
         * Single non-applicable commit is squashed into parent
         * Multiple non-applicable commit is squashed into parent
         * Merge of NA and A with NA root
@@ -16,7 +16,7 @@ Tests Needed:
         * New ref to existing commit
         * New ref to removed commit
         * Multiple new refs
-    * General
+    * General (upstream & downstream)
         * Pushing:
             * (New|Existing sha) x (New|Existing Ref)
             * Force delete
@@ -25,7 +25,7 @@ Tests Needed:
             * Works only on refs/heads/*
             * ignore tags
             * Signed commits aren't resigned
-            * What about refs pointing to other refs
+            * What about refs pointing to other refs - are these only tags?
     
  * General Tests:
     * Clone on a big complex repo with multiple branches & root commits & make sure it looks okay
