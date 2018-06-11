@@ -1,10 +1,6 @@
 use std::error;
 use std::fmt;
-use std::path::Path;
-use std::ffi::OsStr;
 use std;
-use std::error::Error;
-use std::process::Output;
 
 
 use std::os::unix::io::FromRawFd;
@@ -35,20 +31,6 @@ impl error::Error for StringError {
     fn cause(&self) -> Option<&error::Error> {
         None
     }
-}
-
-pub fn command_raw<P, C, I, S>(path: P, command: C, args: I) -> Result<Output, Box<Error>>
-    where P: AsRef<Path>, C: AsRef<OsStr>, I: IntoIterator<Item=S>, S: AsRef<OsStr>
-{
-    let mut process = std::process::Command::new(&command);
-    process
-        .env_clear()
-        .env("PATH", std::env::var("PATH").unwrap());
-
-    process.args(args);
-    process.current_dir(path.as_ref());
-
-    Ok(process.output()?)
 }
 
 /// Double forks the current process, exiting the parent processes.
