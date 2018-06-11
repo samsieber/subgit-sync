@@ -173,13 +173,15 @@ impl SyncRefs {
         info!("Running Sync Refs");
 
         wrapped.update_self();
-        for request in self.requests {
-            wrapped.import_upstream_commits(
-                &request.ref_name,
-                git::optionify_sha(request.old_upstream_sha),
-                git::optionify_sha(request.new_upstream_sha),
-            );
-        };
+        self.requests.into_iter()
+            .filter(|req| git::is_applicable(&req.ref_name))
+            .for_each(|request| {
+                wrapped.import_upstream_commits(
+                    &request.ref_name,
+                    git::optionify_sha(request.old_upstream_sha),
+                    git::optionify_sha(request.new_upstream_sha),
+                );
+            });
 
         Ok(())
     }

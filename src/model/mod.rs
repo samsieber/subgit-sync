@@ -70,6 +70,10 @@ impl WrappedSubGit {
         new_sha: Oid,
     ) -> Result<(), Box<Error>> {
         println!("Starting on hook!");
+        if !git::is_applicable(&ref_name.as_ref()) {
+            info!("Skipping non-applicable ref: {}", ref_name.as_ref());
+            return Ok(());
+        }
         let old = if old_sha == git::no_sha() {
             None
         } else {

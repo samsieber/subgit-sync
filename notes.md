@@ -5,9 +5,11 @@ Logging Setup Needs:
  * Catch and record backtraces?
  
 Things to do:
- * Filter refs for pushes
  * Add option for easy overwriting of hook
  * Remove old refs during sync-all
+ * Test force pushes and deletions
+    * Disallow force push from downstream
+    * Allow force pushes from upstream
 
 Tests Needed:
  * Narrow tests (Notation: A = Applicable, NA = Non-applicable e.g. doesn't need copying to subgit)
