@@ -86,6 +86,7 @@ impl TestWrapper {
 
         set_credentials(&up_bare);
         set_credentials(&up);
+        set_push_setting(&up);
 
         let upstream = ExtGit { path: d.join("upstream") };
 
@@ -112,6 +113,7 @@ impl TestWrapper {
 
         set_credentials(&local_bare);
         set_credentials(&local);
+        set_push_setting(&local);
 
         let wrapper = TestWrapper {
             root: root.clone(),
@@ -127,6 +129,11 @@ impl TestWrapper {
     }
 }
 
+
+fn set_push_setting<P: AsRef<Path>>(path: P) {
+    util::command(path, "git", ["config", "push.default", "simple"].iter()).unwrap();
+}
+
 impl ExtGit {
     pub fn update_working(&self, files: Vec<FileAction>){
         files.iter().for_each(|file_action| file_action.apply(&self.path));
@@ -137,7 +144,7 @@ impl ExtGit {
     }
 
     pub fn add<P: AsRef<str>>(&self, path: P) -> GitResult {
-        util::command(&self.path, "git", ["add", path.as_ref()].iter())
+        util::command(&self.path, "git", ["add", "--all", path.as_ref()].iter())
     }
 
     pub fn checkout<R: AsRef<str>>(&self, ref_ish: R) -> GitResult {
@@ -239,10 +246,11 @@ where P: AsRef<Path>, K: AsRef<Path>, V: AsRef<[u8]>, F: IntoIterator<Item=(K,V)
 
     set_credentials(&up_bare);
     set_credentials(&up);
+    set_push_setting(&up);
 
     {
         util::write_files(&up, files.next().unwrap())?;
-        util::command(&up, "git", ["add", "."].iter())?;
+        util::command(&up, "git", ["add", "--all", "."].iter())?;
         util::command(&up, "git", ["commit", "-m", "(1) First upstream commit"].iter())?;
         util::command(&up, "git", ["push"].iter())?;
     };
@@ -271,13 +279,14 @@ where P: AsRef<Path>, K: AsRef<Path>, V: AsRef<[u8]>, F: IntoIterator<Item=(K,V)
 
     set_credentials(&local_bare);
     set_credentials(&local);
+    set_push_setting(&local);
 
     assert_dir_content_equal(&local, &up.join("sub"));
 
     {
         util::write_files(&local, files.next().unwrap())?;
 
-        util::command(&local, "git", ["add", "."].iter())?;
+        util::command(&local, "git", ["add", "--all", "."].iter())?;
         util::command(&local, "git", ["commit", "-m", "(2) First subgit commit"].iter())?;
         util::command(&local, "git", ["push"].iter())?;
 
@@ -289,7 +298,7 @@ where P: AsRef<Path>, K: AsRef<Path>, V: AsRef<[u8]>, F: IntoIterator<Item=(K,V)
     {
         util::write_files(&up, files.next().unwrap())?;
 
-        util::command(&up, "git", ["add", "."].iter())?;
+        util::command(&up, "git", ["add", "--all", "."].iter())?;
         util::command(&up, "git", ["commit", "-m", "(3) Second upstream commit"].iter())?;
         util::command(&up, "git", ["push"].iter())?;
 

@@ -68,6 +68,11 @@ pub fn disable_gc(repo: &Repository) {
     config.set_i32("gc.auto", 0).unwrap();
 }
 
+pub fn set_push_simple(repo: &Repository){
+    let mut config = repo.config().unwrap();
+    config.set_str("push.default", "simple").unwrap();
+}
+
 fn find_earliest_commit_on_folder(repo: &Repository, target: &str) -> Option<Oid> {
     //git rev-list --reverse --topo-order HEAD --
     let mut process = std::process::Command::new("git");

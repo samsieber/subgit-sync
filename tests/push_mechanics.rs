@@ -129,7 +129,7 @@ pub fn delete_branch_from_downstream() {
 
 #[test]
 pub fn delete_branch_from_upstream() {
-    let test = TestWrapper::new("delete_branch_from_downstream", |upstream| {
+    let test = TestWrapper::new("delete_branch_from_upstream", |upstream| {
         upstream.update_working(vec![
             FileAction::overwrite("sub/hello.txt", "Hello world (from upstream)"),
         ]);
