@@ -68,6 +68,12 @@ impl SetupRequest {
     }
 }
 
+fn read_to_string<R : Read>(readable: &mut R) -> String {
+    let mut s = String::new();
+    readable.read_to_string(&mut s).unwrap();
+    s
+}
+
 impl ExecEnv {
     pub fn detect() -> ExecEnv {
         let git_os_dir = env::var_os("GIT_DIR");
@@ -114,7 +120,7 @@ impl ExecEnv {
         match self {
             ExecEnv::Upstream(env) => Ok(Action::RequestSync(action::RequestSync {
                 env,
-                stdin: std::io::stdin().bytes().collect::<Result<Vec<u8>,_>>()?,
+                stdin: read_to_string(&mut std::io::stdin()).into_bytes(),
             })),
             ExecEnv::Subgit(env) => {
                 let args: Vec<_> = iterable.into_iter().collect();
@@ -127,12 +133,8 @@ impl ExecEnv {
                         "sync-all" => Ok(Action::SyncAll(action::SyncAll { env })),
                         "sync-refs" => {
 
-                            let stdin_bytes = std::io::stdin().bytes().collect::<Result<Vec<u8>,_>>()?;
-
-                            let s = match std::str::from_utf8(&stdin_bytes) {
-                                Ok(v) => v,
-                                Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-                            };
+                            let mut s = String::new();
+                            std::io::stdin().read_to_string(&mut s).unwrap();
 
                             let reqs = s.lines().map(|v| v.trim()).map(|line| -> Result<action::RefSyncRequest, Box<Error>> {
                                 let entries = line.split(" ").collect::<Vec<&str>>();
