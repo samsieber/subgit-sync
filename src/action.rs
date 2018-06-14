@@ -126,6 +126,7 @@ impl Setup {
             self.subgit_hook_path,
             self.upstream_hook_path,
         )?;
+        wrapped.import_initial_empty_commits();
         wrapped.update_all_from_upstream()?;
 
         Ok(())

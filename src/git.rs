@@ -68,6 +68,49 @@ pub fn disable_gc(repo: &Repository) {
     config.set_i32("gc.auto", 0).unwrap();
 }
 
+fn find_earliest_commit_on_folder(repo: &Repository, target: &str) -> Option<Oid> {
+    //git rev-list --reverse --topo-order HEAD --
+    let mut process = std::process::Command::new("git");
+    process
+        .env_clear()
+        .env("PATH", std::env::var("PATH").unwrap());
+
+    process.arg("rev-list");
+    process.arg("--reverse");
+    process.arg("--topo-order");
+    process.arg("HEAD");
+    process.arg("--");
+    process.arg(target);
+
+    process.current_dir(repo.path());
+
+    debug!("Finding earliest commit in  {:?} / {}", repo.path(), target);
+
+    let result = process.output().unwrap();
+
+    if !result.status.success() {
+        panic!("Could not read from repo");
+    } else {
+        let full = std::str::from_utf8(&result.stdout).unwrap();
+        let oids = full.trim();
+        info!("OIDS text: '{}'", &oids);
+        oids.split('\n').filter(|v| !v.is_empty()).nth(0).map(|v| Oid::from_str(v).unwrap())
+    }
+}
+
+pub fn find_safe_empty_na_commits(repo: &Repository, target: &str) -> Vec<Oid> {
+    let earliest = find_earliest_commit_on_folder(repo, target);
+    let mut rev_walk = repo.revwalk().unwrap();
+    if let Some(earliest_oid) = earliest {
+        rev_walk.push(earliest_oid).unwrap();
+    } else {
+        rev_walk.push_head().unwrap();
+    }
+    let mut commits: Vec<Oid> = rev_walk.into_iter().map(|v| v.unwrap()).collect();
+    commits.remove(0);
+    commits
+}
+
 pub fn find_earliest_commit(repo: &Repository) -> Oid {
     let walker = &mut repo.revwalk().unwrap();
     walker
@@ -105,16 +148,16 @@ pub fn fetch_all_ext(repo: &Repository) -> Result<(), Box<Error>> {
 }
 
 pub fn get_n_recent_shas(repo: &Repository, n: usize) -> Vec<Oid> {
-    //git log -n %s --all --format=format:%%Hlet mut process = std::process::Command::new("git");
+    //git for-each-ref --count=3 --sort='-authordate' --format='%(objectname) - %(subject)' refs/heads
     let mut process = std::process::Command::new("git");
     process
         .env_clear()
         .env("PATH", std::env::var("PATH").unwrap());
-    process.arg("log");
-    process.arg("-n");
-    process.arg(&format!("{}", n));
-    process.arg("--all");
-    process.arg("--format=format:%H");
+    process.arg("for-each-ref");
+    process.arg(&format!("--count={}", n));
+    process.arg("--sort=-authordate"); // Sort by author date, descending ( the '-' in author date means sort descending)
+    process.arg("--format=%(objectname)"); // Output the sha (objectname)
+    process.arg("refs/heads");
 
     process.current_dir(repo.path());
 
@@ -125,13 +168,16 @@ pub fn get_n_recent_shas(repo: &Repository, n: usize) -> Vec<Oid> {
     if !result.status.success() {
         panic!("Could not fetch all- exit code was {}. Full result of fetch: {}", &result.status, String::from_utf8(result.stderr).unwrap());
     } else {
-        let full = std::str::from_utf8(&result.stdout).unwrap();
-        let oids = full.trim();
-        oids.split('\n').map(|v| Oid::from_str(v).unwrap()).collect()
+        let full = std::str::from_utf8(&result.stdout).unwrap().trim();
+//        let mut oids : Vec<Oid> =
+            full.split('\n').filter(|v| !v.is_empty()).map(|v| Oid::from_str(v).unwrap()).collect()
+//            ;
+//        oids.push(repo.head().unwrap().peel_to_commit().unwrap().id());
+//        oids
     }
 }
 
-pub fn push_sha_ext<S: AsRef<str>>(repo: &Repository, ref_name: S, git_push_options: Option<Vec<String>>) -> Result<(), Box<Error>> {
+pub fn push_sha_ext<S: AsRef<str>>(repo: &Repository, ref_name: S, force_push: bool, git_push_options: Option<Vec<String>>) -> Result<(), Box<Error>> {
     let mut process = std::process::Command::new("git");
     process
         .env_clear()
@@ -144,11 +190,17 @@ pub fn push_sha_ext<S: AsRef<str>>(repo: &Repository, ref_name: S, git_push_opti
     };
     process.arg("push");
     process.arg("origin");
-    process.arg(format!("HEAD:{}", ref_name.as_ref()));
+    if force_push {
+        info!("Force pushing");
+        process.arg(format!("+HEAD:{}", ref_name.as_ref()));
+    } else {
+        info!("Not force pushing");
+        process.arg(format!("HEAD:{}", ref_name.as_ref()));
+    }
 
     process.current_dir(repo.workdir().unwrap());
 
-    info!("Pushing from {:?}", repo.workdir());
+    info!("Pushing 'HEAD:{}' from {:?}", ref_name.as_ref(), repo.workdir());
 
     let result = process.output()?;
 
@@ -176,7 +228,7 @@ pub fn delete_remote_branch<S: AsRef<str>>(repo: &Repository, ref_name: S, git_p
 
     process.current_dir(repo.workdir().unwrap());
 
-    println!("Pushing from {:?}", repo.workdir());
+    info!("Pushing ':{}' from {:?}", ref_name.as_ref(), repo.workdir());
 
     let result = process.output()?;
 

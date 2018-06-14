@@ -265,3 +265,25 @@ pub fn import_merged_a_a() {
         upstream.push().unwrap();
     }, "sub").unwrap();
 }
+
+#[test]
+pub fn import_many_na() {
+    TestWrapper::new("import_many_na", |upstream| {
+        for n in 1..20 {
+            upstream.update_working(vec![
+                FileAction::overwrite("iter.txt", format!("Content from commit {} upstream", &n)),
+            ]);
+            upstream.add(".").unwrap();
+            upstream.commit(format!("Commit {} from Upstream", &n)).unwrap();
+
+        }
+
+        upstream.update_working(vec![
+            FileAction::overwrite("sub/again.txt", "Applicable"),
+        ]);
+        upstream.add(".").unwrap();
+        upstream.commit("First applicable commit from Upstream").unwrap();
+
+        upstream.push().unwrap();
+    }, "sub").unwrap();
+}
