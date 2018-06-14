@@ -13,6 +13,7 @@ extern crate git2;
 extern crate hex;
 extern crate simplelog;
 extern crate nix;
+extern crate libc;
 
 use std::error::Error;
 use std::path::Path;

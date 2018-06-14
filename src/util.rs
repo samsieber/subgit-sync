@@ -1,6 +1,7 @@
 use std::error;
 use std::fmt;
 use std;
+use libc;
 
 
 use std::os::unix::io::FromRawFd;
@@ -51,10 +52,8 @@ pub fn fork_into_child() {
                 }
                 Ok(ForkResult::Child) => {
                     {
-                        unsafe {
-                            File::from_raw_fd(0);
-                            File::from_raw_fd(1);
-                            File::from_raw_fd(2);
+                        unsafe{
+                            libc::daemon(1, 0);
                         }
                     }
                 },
