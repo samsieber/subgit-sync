@@ -20,7 +20,11 @@ pub enum ExecEnv {
 
 fn find_subgit_from_hook() -> Result<PathBuf, Box<Error>> {
     let path = env::current_exe()?;
-    Ok(read_link(path)?)
+    if std::fs::symlink_metadata(&path)?.file_type().is_symlink() {
+        Ok(read_link(&path)?)
+    } else {
+        Ok(path)
+    }
 }
 
 #[derive(StructOpt)]
