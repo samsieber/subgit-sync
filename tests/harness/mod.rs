@@ -77,9 +77,7 @@ impl TestWrapper {
         dest.pull().unwrap();
     }
 
-    pub fn new<P : AsRef<str>, S: FnOnce(&ExtGit) -> ()>(name: P, setup: S, subgit_eq: &str) -> Result<TestWrapper, Box<Error>> {
-        let root = test_dir(name.as_ref());
-
+    fn new_instance<P : AsRef<Path>, S: FnOnce(&ExtGit) -> ()>(root: P, setup: S, subgit_eq: &str, extra: &[&str]) -> Result<TestWrapper, Box<Error>> {
         let d: &Path = root.as_ref();
         let up_bare = init_bare_repo("upstream.git", &d)?;
         let up = clone(&d, &up_bare)?;
@@ -101,9 +99,10 @@ impl TestWrapper {
             .env("PATH", std::env::var("PATH").unwrap());
         process.arg(&up_bare.as_path().to_string_lossy().as_ref());
         process.arg(&local_bare.as_path().to_string_lossy().as_ref());
-        process.arg("-f");
-        process.arg(&d.join("test_setup.log"));
-        process.arg("sub");
+        for v in  extra {
+            process.arg(*v);
+        }
+        process.arg(subgit_eq);
         process.env("RUST_BACKTRACE", "1");
 
         let res : ExitStatus = process.spawn().unwrap().wait().unwrap();
@@ -116,7 +115,7 @@ impl TestWrapper {
         set_push_setting(&local);
 
         let wrapper = TestWrapper {
-            root: root.clone(),
+            root: root.as_ref().to_owned(),
             upstream,
             downstream: ExtGit { path: d.join("subgit") },
             upstream_sub_path: PathBuf::from(subgit_eq),
@@ -126,6 +125,23 @@ impl TestWrapper {
         wrapper.do_then_verify(|_,_| {Ok(())});
 
         Ok(wrapper)
+    }
+
+    pub fn new_adv<P : AsRef<str>, S: FnOnce(&ExtGit) -> (), A: FnOnce(&Path) -> Vec<String>>(name: P, setup: S, subgit_eq: &str, gen_args: A) -> Result<TestWrapper, Box<Error>> {
+        let root = test_dir(name.as_ref());
+        let extra = gen_args(&root);
+        let temp_log_path = root.clone().join("test_setup.log");
+        let log_path = temp_log_path.to_string_lossy();
+        let mut extra_args = vec!("-f", &log_path);
+        extra.iter().for_each(|v| extra_args.push(v));
+        TestWrapper::new_instance(&root, setup, subgit_eq, &extra_args)
+    }
+
+    pub fn new<P : AsRef<str>, S: FnOnce(&ExtGit) -> ()>(name: P, setup: S, subgit_eq: &str) -> Result<TestWrapper, Box<Error>> {
+        let root = test_dir(name.as_ref());
+        let temp_log_path = root.clone().join("test_setup.log");
+        let log_path = temp_log_path.to_string_lossy();
+        TestWrapper::new_instance(&root, setup, subgit_eq, &["-f", &root.join("test_setup.log").to_string_lossy()])
     }
 }
 
