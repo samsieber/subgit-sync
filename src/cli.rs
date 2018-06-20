@@ -13,6 +13,7 @@ use action;
 use util::StringError;
 use action::EnvDetect;
 use model::settings::SETTINGS_FILE;
+use structopt::clap::AppSettings;
 
 pub enum ExecEnv {
     Subgit(SubGitEnv),
@@ -40,38 +41,69 @@ fn parse_env_base_recursion_detection(input: &&str) -> EnvDetect {
     }
 }
 
+
+/// Installs git hooks to republish a path of repository (henceforth: upstream)
+/// as it's own top-level repository (henceforth: subgit) and synchronize commits between them,
+/// using the upstream as the source of truth
+///
+/// It's designed to be used on repositories that reside on the same filesystem, for which you
+/// have admin access.
+///
+/// It places an server-side update hook in the subgit repo, and a server-side post-receive hook
+/// in the upstream repo. The update hooks synchronously exports commits from the subgit repo
+/// to the upstream repo, refusing the push if the upstream cannot be updated. The upstream
+/// hook asynchronously requests the subgit to import the newly pushed commits
 #[derive(StructOpt)]
-#[structopt()]
+#[structopt(raw(global_settings="&[AppSettings::DeriveDisplayOrder]"))]
 struct SetupRequest {
-    // The git location
+    /// The location of the bare upstream repository on disk
     upstream_git_location: String,
+    /// The location of the bare subgit repository on disk
     subgit_git_location: String,
 
-    // The path mapping
+    /// The path in the upstream repository to republish as the root in the subgit repository
     upstream_map_path: String,
 
-    #[structopt(short = "P", long = "upstream_path_to_republish")]
+    /// The path in the subgit repo to place the republished files from upstream
+    /// Defaults to the root of the repository
+    #[structopt(short = "p", long = "subgit_map_path")]
     subgit_map_path: Option<String>,
 
-    // The log level to use
+    /// The log level to use when logging to file from the hooks
     #[structopt(short = "l", long = "log_level")]
     log_level: Option<LevelFilter>,
+    /// The path of the log file to write to during setup
     #[structopt(short = "f", long = "log_file", parse(from_os_str))]
     log_file: Option<PathBuf>,
 
-    // The hook paths
-    #[structopt(short = "H", long = "upstream_hook_path")]
-    upstream_hook_path: Option<String>,
-    #[structopt(short = "h", long = "subgit_hook_path")]
-    subgit_hook_path: Option<String>,
-    #[structopt(short = "U", long = "upstream_clone_url")]
+    /// The hook path to use in the upstream repository
+    #[structopt(short = "H", long = "upstream_hook_path", default_value = "hooks/post-receive", parse(from_os_str))]
+    upstream_hook_path: PathBuf,
+    /// The hook path to use in the subgit repository
+    #[structopt(short = "h", long = "subgit_hook_path", default_value = "hooks/update", parse(from_os_str))]
+    subgit_hook_path: PathBuf,
+
+    /// Specify an external url to push changes to, when exporting commits to the upstream from the subgit
+    /// If not set, uses the file path to the upstream repo
+    #[structopt(short = "U", long = "upstream_working_clone_url")]
     upstream_working_clone_url: Option<String>,
-    #[structopt(short = "u", long = "subgit_clone_url", conflicts_with = "disable_recursion_detection")]
+
+    /// Specify an external url to push changes to, when import commits in the subgit from the upstream
+    /// If not set, uses a modified subgit bare repo that bypasses the server hooks
+    #[structopt(short = "u", long = "subgit_working_clone_url", conflicts_with = "disable_recursion_detection")]
     subgit_working_clone_url: Option<String>,
 
+    /// Specifies an environment variable name and value to look for when trying to detect recursive hook calls
+    /// Defaults to using the --push-option added in git 2.10
+    /// The value must be in the form of ENV_NAME:ENV_VALUE
+    /// For example, for gitlab servers, you'd most likely use 'GL_USERNAME:git' as the value
     #[structopt(short = "r", long = "env_based_recursion_detection", parse(from_str = "parse_env_base_recursion_detection"))]
     env_based_recursion_detection: Option<EnvDetect>,
-    #[structopt(short = "d", long = "disable_recursion_detection", conflicts_with = "subgit_clone_url")]
+
+    /// Disables recursive hook call checking
+    /// This cannot be used with a custom subgit_working_clone_url due to the infinite recursion that occurs
+    /// when both the upstream hook and subgit hook are triggered during synchronization
+    #[structopt(short = "d", long = "disable_recursion_detection", conflicts_with = "subgit_working_clone_url")]
     disable_recursion_detection: bool,
 }
 
@@ -97,9 +129,9 @@ impl SetupRequest {
             log_level: self.log_level.unwrap_or(LevelFilter::Debug),
             log_file: self.log_file.unwrap_or(PathBuf::from("git_subgit_setup.log")),
 
-            subgit_hook_path: self.subgit_hook_path.map(|v| PathBuf::from(v)),
+            subgit_hook_path: self.subgit_hook_path,
             subgit_working_clone_url: self.subgit_working_clone_url,
-            upstream_hook_path: self.upstream_hook_path.map(|v| PathBuf::from(v)),
+            upstream_hook_path: self.upstream_hook_path,
             upstream_working_clone_url: self.upstream_working_clone_url,
 
             recursion_detection,

@@ -92,8 +92,8 @@ pub struct Setup {
     pub log_file: PathBuf,
 
     // The hook paths
-    pub upstream_hook_path: Option<PathBuf>,
-    pub subgit_hook_path: Option<PathBuf>,
+    pub upstream_hook_path: PathBuf,
+    pub subgit_hook_path: PathBuf,
     pub upstream_working_clone_url: Option<String>,
     pub subgit_working_clone_url: Option<String>,
 

@@ -243,9 +243,9 @@ impl WrappedSubGit {
         log_level: LevelFilter,
         log_file: PathBuf,
         bin_loc: BinSource,
-        subgit_hook_path: Option<PathBuf>,
+        subgit_hook_path: PathBuf,
         subgit_working_clone_url: Option<String>,
-        upstream_hook_path: Option<PathBuf>,
+        upstream_hook_path: PathBuf,
         upstream_working_clone_url: Option<String>,
         recursion_detection: RecursionDetection,
     ) -> Result<WrappedSubGit, Box<Error>> {
@@ -387,10 +387,10 @@ impl WrappedSubGit {
         };
 
         info!("Adding subgit hook");
-        std::os::unix::fs::symlink(fs::make_absolute(&hook_path)?, subgit_location.as_ref().join(subgit_hook_path.unwrap_or(PathBuf::from("hooks/update"))))?;
+        std::os::unix::fs::symlink(fs::make_absolute(&hook_path)?, subgit_location.as_ref().join(subgit_hook_path))?;
 
         info!("Adding upstream hook");
-        std::os::unix::fs::symlink(fs::make_absolute(&hook_path)?, upstream_location.as_ref().join(upstream_hook_path.unwrap_or(PathBuf::from("hooks/post-receive"))))?;
+        std::os::unix::fs::symlink(fs::make_absolute(&hook_path)?, upstream_location.as_ref().join(upstream_hook_path))?;
 
         Ok(WrappedSubGit {
             location: subgit_location.as_ref().to_owned(),

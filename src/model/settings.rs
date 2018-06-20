@@ -61,7 +61,7 @@ impl Settings {
 
     pub fn setup_logging(&self) {
         logging::configure_logging(
-            LevelFilter::Debug,
+            LevelFilter::Info,
             self.internal.file_log_level,
             &self.data_dir.join("logs").join("sync.log"),
         );
