@@ -10,6 +10,7 @@ use git;
 use std::process::Stdio;
 use std::io::Write;
 use std::path::Path;
+use action::RecursionDetection::EnvBased;
 
 pub type RunResult = Result<(), Box<Error>>;
 
@@ -37,6 +38,42 @@ pub struct SyncAll {
     pub env: SubGitEnv,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EnvDetect {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum RecursionDetection {
+    Disabled,
+    UsePushOptions,
+    EnvBased(EnvDetect),
+}
+
+impl RecursionDetection {
+    pub fn get_push_opts(&self) -> Option<Vec<String>>{
+        info!("Using push opts from {:?}", &self);
+        match self {
+            RecursionDetection::UsePushOptions => Some(vec!("IGNORE_SUBGIT_UPDATE".to_string())),
+            RecursionDetection::EnvBased(env_detect) => None,
+            RecursionDetection::Disabled => None,
+        }
+    }
+
+    pub fn is_recursing(&self) -> bool {
+        match &self {
+            RecursionDetection::Disabled => false,
+            RecursionDetection::UsePushOptions => git::get_git_options().unwrap_or(vec!()).iter().any(|x| x == "IGNORE_SUBGIT_UPDATE"),
+            RecursionDetection::EnvBased(env_detect) => if let Ok(value) = env::var(&env_detect.name) {
+                value == env_detect.value
+            } else {
+                false
+            },
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Setup {
     // Where we copy the binary from when we're done
@@ -58,6 +95,9 @@ pub struct Setup {
     pub upstream_hook_path: Option<PathBuf>,
     pub subgit_hook_path: Option<PathBuf>,
     pub upstream_working_clone_url: Option<String>,
+
+    // recursion detection
+    pub recursion_detection: RecursionDetection,
 }
 
 #[derive(Debug)]
@@ -85,9 +125,6 @@ pub enum Action {
 
 impl RequestSync {
     fn run(self) -> RunResult {
-        if git::get_git_options().unwrap_or(vec!()).iter().any(|x| x == "IGNORE_SUBGIT_UPDATE") {
-            return Ok(());
-        }
         let mut child = Command::new(&self.env.hook_path)
             .env_clear()
             .env("PATH", env::var("PATH").unwrap())
@@ -127,6 +164,7 @@ impl Setup {
             self.subgit_hook_path,
             self.upstream_hook_path,
             self.upstream_working_clone_url,
+            self.recursion_detection,
         )?;
         wrapped.import_initial_empty_commits();
         wrapped.update_all_from_upstream()?;
@@ -138,6 +176,10 @@ impl Setup {
 impl UpdateHook {
     pub fn run(self) -> RunResult {
         let wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
+
+        if wrapped.should_abort_hook() {
+            return Ok(());
+        }
 
         info!("Opened Wrapped");
         lock(&wrapped.location)?;
@@ -153,6 +195,10 @@ impl UpdateHook {
 impl SyncAll {
     pub fn run(self) -> RunResult {
         let wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
+
+        if wrapped.should_abort_hook() {
+            return Ok(());
+        }
 
         info!("Opened Wrapped");
         lock(&wrapped.location)?;
@@ -170,6 +216,10 @@ impl SyncRefs {
         super::util::fork_into_child();
 
         let wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
+
+        if wrapped.should_abort_hook() {
+            return Ok(());
+        }
 
         info!("Opened Wrapped");
         lock(&wrapped.location)?;

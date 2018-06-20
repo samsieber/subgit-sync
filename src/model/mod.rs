@@ -18,6 +18,7 @@ use simplelog::WriteLogger;
 use simplelog::Config;
 use std::fs::File;
 use action::lock;
+use action::RecursionDetection;
 
 pub struct WrappedSubGit {
     pub location: PathBuf,
@@ -28,6 +29,7 @@ pub struct WrappedSubGit {
     pub local_working: Repository,
     pub local_bare: Repository,
     pub local_path: String,
+    pub recursion_detection: RecursionDetection,
 }
 
 pub struct BinSource {
@@ -55,6 +57,7 @@ impl WrappedSubGit {
             local_working: Repository::open(subgit_data_path.join("local"))?,
             local_bare: Repository::open(subgit_data_path.join("local.git"))?,
             local_path: git_settings.local_path(),
+            recursion_detection: git_settings.recursion_detection(),
         })
     }
 
@@ -141,7 +144,7 @@ impl WrappedSubGit {
     ) -> Option<Oid> {
         let sha_copier = self.get_exporter();
 
-        sha_copier.copy_ref_unchecked(ref_name, old_local_sha, new_local_sha, false, Some(vec!("IGNORE_SUBGIT_UPDATE".to_owned())))
+        sha_copier.copy_ref_unchecked(ref_name, old_local_sha, new_local_sha, false, self.recursion_detection.get_push_opts())
     }
 
     pub fn import_upstream_commits(
@@ -239,6 +242,7 @@ impl WrappedSubGit {
         subgit_hook_path: Option<PathBuf>,
         upstream_hook_path: Option<PathBuf>,
         upstream_working_clone_url: Option<String>,
+        recursion_detection: RecursionDetection,
     ) -> Result<WrappedSubGit, Box<Error>> {
         WriteLogger::init(
             LevelFilter::Debug,
@@ -353,6 +357,7 @@ impl WrappedSubGit {
             upstream_map_path.to_string(),
             subgit_map_path.unwrap_or("").to_owned(),
             log_level,
+            recursion_detection.clone(),
         );
 
         info!("Generating lock file");
@@ -382,6 +387,7 @@ impl WrappedSubGit {
             local_working: mirror_working,
             local_bare: Repository::open_bare(subgit_data_path.join("local.git"))?,
             local_path: subgit_map_path.unwrap_or("").to_owned(),
+            recursion_detection,
         })
     }
 }

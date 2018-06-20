@@ -3,12 +3,14 @@ use log::LevelFilter;
 use std::path::{Path, PathBuf};
 use logging;
 use fs;
+use action::RecursionDetection;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct SettingsFile {
     upstream_path: String,
     subgit_path: String,
     file_log_level: LevelFilter,
+    recursion_detection: RecursionDetection,
 }
 
 pub struct Settings {
@@ -22,6 +24,7 @@ impl Settings {
         upstream_path: String,
         subgit_path: String,
         file_log_level: LevelFilter,
+        recursion_detection: RecursionDetection,
     ) {
         let data_dir = path.as_ref();
         fs::write_content_to_file(
@@ -30,9 +33,12 @@ impl Settings {
                 upstream_path: upstream_path,
                 subgit_path: subgit_path,
                 file_log_level: file_log_level,
+                recursion_detection: recursion_detection,
             }).unwrap(),
         );
     }
+
+    pub fn recursion_detection(&self) -> RecursionDetection { self.internal.recursion_detection.clone() }
 
     pub fn upstream_path(&self) -> String {
         self.internal.upstream_path.clone()

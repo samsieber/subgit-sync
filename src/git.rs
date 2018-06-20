@@ -199,13 +199,14 @@ pub fn push_sha_ext<S: AsRef<str>>(repo: &Repository, ref_name: S, force_push: b
     process
         .env_clear()
         .env("PATH", std::env::var("PATH").unwrap());
+    process.arg("push");
+
     if let Some(git_push_opts) = git_push_options {
-        process.env("GIT_PUSH_OPTION_COUNT", format!("{}", git_push_opts.len()));
-        for (idx, val) in git_push_opts.iter().enumerate() {
-            process.env(format!("GIT_PUSH_OPTION_{}", idx), val);
+        for val in git_push_opts {
+            process.arg(format!("--push-option={}", val));
         }
     };
-    process.arg("push");
+
     process.arg("origin");
     if force_push {
         info!("Force pushing");
@@ -236,7 +237,7 @@ pub fn delete_remote_branch<S: AsRef<str>>(repo: &Repository, ref_name: S, git_p
     if let Some(git_push_opts) = git_push_options {
         process.env("GIT_PUSH_OPTION_COUNT", format!("{}", git_push_opts.len()));
         for (idx, val) in git_push_opts.iter().enumerate() {
-            process.env(format!("GIT_PUSH_OPTION_{}", idx), val);
+            process.env(format!("GIT_PUSH_OPTION_{}", idx), &val);
         }
     };
     process.arg("push");

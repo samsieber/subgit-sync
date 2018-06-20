@@ -11,6 +11,7 @@ use action::{Action, SubGitEnv};
 use git2::Oid;
 use action;
 use util::StringError;
+use action::EnvDetect;
 
 pub enum ExecEnv {
     Subgit(SubGitEnv),
@@ -24,6 +25,17 @@ fn find_subgit_from_hook() -> Result<PathBuf, Box<Error>> {
         Ok(read_link(&path)?)
     } else {
         Ok(path)
+    }
+}
+
+
+fn parse_env_base_recursion_detection(input: &&str) -> EnvDetect {
+    let mut iter = input.splitn(2, ":");
+    let env_variable_name = iter.next().unwrap();
+    let env_variable_value = iter.next().unwrap();
+    EnvDetect {
+        name: env_variable_name.to_string(),
+        value: env_variable_value.to_string(),
     }
 }
 
@@ -53,10 +65,24 @@ struct SetupRequest {
     subgit_hook_path: Option<String>,
     #[structopt(short = "U", long = "upstream_clone_url")]
     upstream_working_clone_url: Option<String>,
+    #[structopt(short = "r", long = "env_based_recursion_detection", parse(from_str = "parse_env_base_recursion_detection"))]
+    env_based_recursion_detection: Option<EnvDetect>,
+
+    #[structopt(short = "d", long = "disable_recursion_detection")]
+    disable_recursion_detection: bool,
 }
 
 impl SetupRequest {
     fn convert(self, copy_from: PathBuf) -> Result<Action, Box<Error>> {
+        let recursion_detection = if self.disable_recursion_detection {
+            action::RecursionDetection::Disabled
+        } else {
+            match self.env_based_recursion_detection {
+                Some(env_detect) => action::RecursionDetection::EnvBased(env_detect),
+                None => action::RecursionDetection::UsePushOptions,
+            }
+        };
+
         Ok(Action::Setup(action::Setup {
             copy_from,
             upstream_git_location: PathBuf::from(self.upstream_git_location),
@@ -71,6 +97,8 @@ impl SetupRequest {
             subgit_hook_path: self.subgit_hook_path.map(|v| PathBuf::from(v)),
             upstream_hook_path: self.upstream_hook_path.map(|v| PathBuf::from(v)),
             upstream_working_clone_url: self.upstream_working_clone_url,
+
+            recursion_detection,
         }))
     }
 }
