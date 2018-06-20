@@ -12,6 +12,7 @@ use git2::Oid;
 use action;
 use util::StringError;
 use action::EnvDetect;
+use model::settings::SETTINGS_FILE;
 
 pub enum ExecEnv {
     Subgit(SubGitEnv),
@@ -121,7 +122,7 @@ impl ExecEnv {
         match git_os_dir {
             Some(git_os_path) => {
                 let git_path = canonicalize(git_os_path).expect("Cannot open the GIT_DIR");
-                if git_path.join("data").join("settings.toml").is_file() {
+                if git_path.join("data").join(SETTINGS_FILE).is_file() {
 //                    eprintln!("In subgit repo");
                     ExecEnv::Subgit(SubGitEnv {
                         git_dir: git_path.clone(),
@@ -133,7 +134,7 @@ impl ExecEnv {
                     let repo_path = hook_path.parent().unwrap().parent().unwrap();
                     if !repo_path
                         .join("data")
-                        .join("settings.toml")
+                        .join(SETTINGS_FILE)
                         .is_file()
                     {
                         panic!("Cannot find subgit path!");

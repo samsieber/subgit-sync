@@ -1,9 +1,11 @@
-use toml;
+use serde_json;
 use log::LevelFilter;
 use std::path::{Path, PathBuf};
 use logging;
 use fs;
 use action::RecursionDetection;
+
+pub const SETTINGS_FILE : &str = "settings.json";
 
 #[derive(Serialize, Deserialize, Debug)]
 struct SettingsFile {
@@ -28,8 +30,8 @@ impl Settings {
     ) {
         let data_dir = path.as_ref();
         fs::write_content_to_file(
-            &data_dir.join("settings.toml"),
-            &toml::to_string(&SettingsFile {
+            &data_dir.join(SETTINGS_FILE),
+            &serde_json::to_string_pretty(&SettingsFile {
                 upstream_path: upstream_path,
                 subgit_path: subgit_path,
                 file_log_level: file_log_level,
@@ -50,9 +52,9 @@ impl Settings {
 
     pub fn load<P: AsRef<Path>>(path: P) -> Settings {
         let data_dir = path.as_ref();
-        let contents = fs::content_of_file_if_exists(&path.as_ref().join("settings.toml")).unwrap();
+        let contents = fs::content_of_file_if_exists(&path.as_ref().join(SETTINGS_FILE)).unwrap();
         Settings {
-            internal: toml::from_str(contents.as_str()).unwrap(),
+            internal: serde_json::from_str(contents.as_str()).unwrap(),
             data_dir: data_dir.to_owned(),
         }
     }

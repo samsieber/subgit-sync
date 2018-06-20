@@ -6,7 +6,7 @@ extern crate serde_derive;
 extern crate structopt;
 
 extern crate serde;
-extern crate toml;
+extern crate serde_json;
 
 extern crate fs2;
 extern crate git2;

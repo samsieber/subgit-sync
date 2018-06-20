@@ -10,7 +10,7 @@ use util;
 
 mod map;
 mod copier;
-mod settings;
+pub mod settings;
 
 use log::LevelFilter;
 use model::map::CommitMapper;
