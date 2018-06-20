@@ -11,11 +11,18 @@ use super::util::*;
 use super::util;
 use std::thread;
 use std::process::ExitStatus;
+use std::cmp::Ordering;
+use std::str::FromStr;
+use std::num::ParseIntError;
 
 // Setup with list of initial commits (generate predictable commit messages if none are given)
 // Do changes & commit
 // Pull
 // Push
+
+const NEEDS_ALLOW_UNRELATED_HISTORIES_MERGE_FLAG : Version = Version {
+    major: 2, minor: 9, dot: 0
+};
 
 pub type GitResult = Result<(), Box<Error>>;
 
@@ -30,13 +37,15 @@ pub struct TestWrapper {
 
 #[derive(Debug, Clone)]
 struct GitDaemon {
-    url: String,
+    upstream: String,
+    subgit: String,
 }
 
 impl GitDaemon {
     pub fn new<P: AsRef<Path>, S: AsRef<str>>(path: P, name: S) -> GitDaemon {
         GitDaemon {
-            url: format!("git://127.0.0.1/{}/upstream.git", path.as_ref().to_string_lossy()),
+            upstream: format!("git://127.0.0.1/{}/upstream.git", path.as_ref().to_string_lossy()),
+            subgit: format!("git://127.0.0.1/{}/subgit.git", path.as_ref().to_string_lossy()),
         }
     }
 }
@@ -44,11 +53,60 @@ impl GitDaemon {
 #[derive(Debug, Clone)]
 pub struct ExtGit {
     path: PathBuf,
+    git_version: Version,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct Version {
+    major: u32,
+    minor: u32,
+    dot: u32,
+}
+
+impl FromStr for Version {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let coords: Vec<&str> = s
+            .split('.')
+            .collect();
+
+        let major = coords[0].parse::<u32>()?;
+        let minor = coords[1].parse::<u32>()?;
+        let dot = coords[1].parse::<u32>()?;
+
+        Ok(Version { major, minor, dot })
+    }
+}
+
+impl Ord for Version {
+    fn cmp(&self, other: &Version) -> Ordering {
+        if self.major.cmp(&other.major) == Ordering::Equal {
+            if self.minor.cmp(&other.minor) == Ordering::Equal {
+                self.dot.cmp(&other.dot)
+            } else {
+                self.minor.cmp(&other.minor)
+            }
+        } else {
+            self.major.cmp(&other.major)
+        }
+    }
+}
+
+impl PartialOrd for Version {
+    fn partial_cmp(&self, other: &Version) -> Option<Ordering> {
+        Some(self.cmp(&other))
+    }
 }
 
 pub enum GitType {
     Upstream,
     Subgit,
+}
+
+fn get_git_version() -> Result<Version, Box<Error>>{
+    let version_string = String::from_utf8(util::command_raw(std::env::current_dir()?, "git", vec!("--version").iter())?.stdout)?;
+    Ok(version_string.split(" ").last().unwrap().parse()?)
 }
 
 impl TestWrapper {
@@ -95,11 +153,13 @@ impl TestWrapper {
         let up_bare = init_bare_repo("upstream.git", &d)?;
         let up = clone(&d, &up_bare)?;
 
+        let version = get_git_version()?;
+
         set_credentials(&up_bare);
         set_credentials(&up);
         set_push_setting(&up);
 
-        let upstream = ExtGit { path: d.join("upstream") };
+        let upstream = ExtGit { path: d.join("upstream"), git_version: version.clone() };
 
         setup(&upstream);
 
@@ -130,7 +190,7 @@ impl TestWrapper {
         let wrapper = TestWrapper {
             root: root.as_ref().to_owned(),
             upstream,
-            downstream: ExtGit { path: d.join("subgit") },
+            downstream: ExtGit { path: d.join("subgit"), git_version: version.clone() },
             upstream_sub_path: PathBuf::from(subgit_eq),
             downstream_sub_path: PathBuf::from(""),
             daemon: git_daemon,
@@ -217,6 +277,9 @@ impl ExtGit {
     pub fn merge<A: AsRef<str>, P: AsRef<[A]>>(&self, args: P) -> GitResult {
         let mut args : Vec<&str> = args.as_ref().into_iter().map(|v| v.as_ref()).collect();
         args.insert(0, "merge");
+        if self.git_version > NEEDS_ALLOW_UNRELATED_HISTORIES_MERGE_FLAG {
+            args.insert(1, "--allow-unrelated-histories");
+        }
         util::command(&self.path, "git", args.iter())
     }
 
