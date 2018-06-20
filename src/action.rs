@@ -95,6 +95,7 @@ pub struct Setup {
     pub upstream_hook_path: Option<PathBuf>,
     pub subgit_hook_path: Option<PathBuf>,
     pub upstream_working_clone_url: Option<String>,
+    pub subgit_working_clone_url: Option<String>,
 
     // recursion detection
     pub recursion_detection: RecursionDetection,
@@ -162,6 +163,7 @@ impl Setup {
                 symlink: false,
             },
             self.subgit_hook_path,
+            self.subgit_working_clone_url,
             self.upstream_hook_path,
             self.upstream_working_clone_url,
             self.recursion_detection,

@@ -201,7 +201,7 @@ impl TestWrapper {
         Ok(wrapper)
     }
 
-    pub fn new_adv<P : AsRef<str>, S: FnOnce(&ExtGit) -> (), A: FnOnce(&Path, Option<String>) -> Vec<String>>
+    pub fn new_adv<P : AsRef<str>, S: FnOnce(&ExtGit) -> (), A: FnOnce(&Path, Option<GitDaemon>) -> Vec<String>>
     (name: P, setup: S, subgit_eq: &str, gen_args: A, use_daemon: bool) -> Result<TestWrapper, Box<Error>> {
         let root = test_dir(name.as_ref());
         let git_daemon = if use_daemon {
@@ -209,14 +209,17 @@ impl TestWrapper {
         } else {
             None
         };
-        let extra = gen_args(&root, git_daemon.as_ref().map(|gd| gd.url.clone()));
+        let extra = gen_args(&root, git_daemon.as_ref().map(|gd| gd.clone()));
         let temp_log_path = root.clone().join("test_setup.log");
         let log_path = temp_log_path.to_string_lossy();
         let mut extra_args = vec!("-f", &log_path);
         extra.iter().for_each(|v| extra_args.push(v));
         if let Some(ref gd) = git_daemon {
-            extra_args.push("-r");
-            extra_args.push(&gd.url);
+            extra_args.push("-U");
+            extra_args.push(&gd.upstream);
+//            extra_args.push("-u");
+//            extra_args.push(&gd.subgit);
+            extra_args.push("-d");
         }
         TestWrapper::new_instance(&root, setup, subgit_eq, &extra_args, git_daemon.clone())
     }
@@ -363,6 +366,7 @@ where P: AsRef<Path>, K: AsRef<Path>, V: AsRef<[u8]>, F: IntoIterator<Item=(K,V)
     process.arg(&local_bare.as_path().to_string_lossy().as_ref());
     process.arg("-f");
     process.arg(&d.join("test_setup.log"));
+    process.arg("-d");
     process.arg("sub");
     process.env("RUST_BACKTRACE", "1");
 

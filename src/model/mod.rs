@@ -61,6 +61,10 @@ impl WrappedSubGit {
         })
     }
 
+    pub fn should_abort_hook(&self) -> bool {
+        self.recursion_detection.is_recursing()
+    }
+
     pub fn update_self(&self) {
         git::fetch_all_ext(&self.local_working).unwrap();
         git::fetch_all_ext(&self.upstream_working).unwrap();
@@ -155,7 +159,7 @@ impl WrappedSubGit {
     ) -> Option<Oid> {
         let sha_copier = self.get_importer();
 
-        sha_copier.copy_ref_unchecked(ref_name, old_upstream_sha, new_upstream_sha, true, None)
+        sha_copier.copy_ref_unchecked(ref_name, old_upstream_sha, new_upstream_sha, true, self.recursion_detection.get_push_opts())
     }
 
     fn get_importer<'a>(&'a self) -> copier::Copier<'a>{
@@ -240,6 +244,7 @@ impl WrappedSubGit {
         log_file: PathBuf,
         bin_loc: BinSource,
         subgit_hook_path: Option<PathBuf>,
+        subgit_working_clone_url: Option<String>,
         upstream_hook_path: Option<PathBuf>,
         upstream_working_clone_url: Option<String>,
         recursion_detection: RecursionDetection,
@@ -253,6 +258,8 @@ impl WrappedSubGit {
         let subgit_path: &Path = subgit_location.as_ref();
         let upstream_path: &Path = upstream_location.as_ref();
         let subgit_data_path = subgit_path.join("data");
+
+        fs::create_dir_all(&subgit_data_path).unwrap();
 
         Repository::open_bare(&upstream_path)?;
         Repository::init_bare(&subgit_path)?;
@@ -282,7 +289,7 @@ impl WrappedSubGit {
         git::set_push_simple(&upstream_working);
 
         info!("Creating mirror bare access (using symlinks, but excluding hooks)");
-        let mirror_raw_path = subgit_data_path.join("local.git");
+        let mirror_raw_path = fs::make_absolute(subgit_data_path.join("local.git")).unwrap();
         fs::create_dir(&mirror_raw_path)?;
         // Symlink most directorys
         fs::symlink_dirs(
@@ -304,8 +311,15 @@ impl WrappedSubGit {
         fs::create_dir(mirror_raw_path.join("hooks"))?;
 
         info!("Create mirror working directory (for moving changes from upstream -> subdir)");
-        let mirror_working = Repository::clone(
-            &mirror_raw_path.to_string_lossy(),
+        let subgit_url_to_clone = subgit_working_clone_url.unwrap_or_else(|| {
+            mirror_raw_path.to_string_lossy().to_string()
+        });
+        git::clone_remote(
+            &subgit_url_to_clone,
+            &subgit_data_path,
+            "local"
+        );
+        let mirror_working =  Repository::open(
             subgit_data_path.join("local"),
         )?;
         git::disable_gc(&mirror_working);

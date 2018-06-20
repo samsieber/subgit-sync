@@ -65,10 +65,12 @@ struct SetupRequest {
     subgit_hook_path: Option<String>,
     #[structopt(short = "U", long = "upstream_clone_url")]
     upstream_working_clone_url: Option<String>,
+    #[structopt(short = "u", long = "subgit_clone_url", conflicts_with = "disable_recursion_detection")]
+    subgit_working_clone_url: Option<String>,
+
     #[structopt(short = "r", long = "env_based_recursion_detection", parse(from_str = "parse_env_base_recursion_detection"))]
     env_based_recursion_detection: Option<EnvDetect>,
-
-    #[structopt(short = "d", long = "disable_recursion_detection")]
+    #[structopt(short = "d", long = "disable_recursion_detection", conflicts_with = "subgit_clone_url")]
     disable_recursion_detection: bool,
 }
 
@@ -95,6 +97,7 @@ impl SetupRequest {
             log_file: self.log_file.unwrap_or(PathBuf::from("git_subgit_setup.log")),
 
             subgit_hook_path: self.subgit_hook_path.map(|v| PathBuf::from(v)),
+            subgit_working_clone_url: self.subgit_working_clone_url,
             upstream_hook_path: self.upstream_hook_path.map(|v| PathBuf::from(v)),
             upstream_working_clone_url: self.upstream_working_clone_url,
 
