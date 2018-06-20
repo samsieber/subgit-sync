@@ -2,7 +2,6 @@ use std::path::PathBuf;
 use std::path::Path;
 use std;
 use std::error::Error;
-use subgit_rs::{WrappedSubGit, BinSource};
 use log::LevelFilter;
 use std::time::Duration;
 use std::thread::sleep;
@@ -138,10 +137,7 @@ impl TestWrapper {
     }
 
     pub fn new<P : AsRef<str>, S: FnOnce(&ExtGit) -> ()>(name: P, setup: S, subgit_eq: &str) -> Result<TestWrapper, Box<Error>> {
-        let root = test_dir(name.as_ref());
-        let temp_log_path = root.clone().join("test_setup.log");
-        let log_path = temp_log_path.to_string_lossy();
-        TestWrapper::new_instance(&root, setup, subgit_eq, &["-f", &root.join("test_setup.log").to_string_lossy()])
+        TestWrapper::new_adv(name, setup, subgit_eq, |r| vec!())
     }
 }
 
