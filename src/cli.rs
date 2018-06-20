@@ -37,7 +37,7 @@ struct SetupRequest {
     // The path mapping
     upstream_map_path: String,
 
-    #[structopt(short = "s", long = "subgit_map_path")]
+    #[structopt(short = "P", long = "upstream_path_to_republish")]
     subgit_map_path: Option<String>,
 
     // The log level to use
@@ -47,18 +47,18 @@ struct SetupRequest {
     log_file: Option<PathBuf>,
 
     // The hook paths
-    #[structopt(short = "U", long = "upstream_hook_path")]
+    #[structopt(short = "H", long = "upstream_hook_path")]
     upstream_hook_path: Option<String>,
-    #[structopt(short = "S", long = "subgit_hook_path")]
+    #[structopt(short = "h", long = "subgit_hook_path")]
     subgit_hook_path: Option<String>,
-    #[structopt(short = "r", long = "upstream_clone_url")]
-    upstream_clone_url: Option<String>,
+    #[structopt(short = "U", long = "upstream_clone_url")]
+    upstream_working_clone_url: Option<String>,
 }
 
 impl SetupRequest {
     fn convert(self, copy_from: PathBuf) -> Result<Action, Box<Error>> {
         Ok(Action::Setup(action::Setup {
-            copy_from: copy_from,
+            copy_from,
             upstream_git_location: PathBuf::from(self.upstream_git_location),
             subgit_git_location: PathBuf::from(self.subgit_git_location),
 
@@ -70,7 +70,7 @@ impl SetupRequest {
 
             subgit_hook_path: self.subgit_hook_path.map(|v| PathBuf::from(v)),
             upstream_hook_path: self.upstream_hook_path.map(|v| PathBuf::from(v)),
-            upstream_working_clone_url: self.upstream_clone_url,
+            upstream_working_clone_url: self.upstream_working_clone_url,
         }))
     }
 }
