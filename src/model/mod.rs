@@ -238,6 +238,7 @@ impl WrappedSubGit {
         bin_loc: BinSource,
         subgit_hook_path: Option<PathBuf>,
         upstream_hook_path: Option<PathBuf>,
+        upstream_working_clone_url: Option<String>,
     ) -> Result<WrappedSubGit, Box<Error>> {
         WriteLogger::init(
             LevelFilter::Debug,
@@ -264,10 +265,15 @@ impl WrappedSubGit {
 //        let upstream_bare = Repository::open_bare(subgit_data_path.join("upstream.git"))?;
 
         info!("Creating upstream working directory (for moving changes from subdir -> upstream)");
-        let upstream_working = Repository::clone(
-            &upstream_path_abs.to_string_lossy(),
-            subgit_data_path.join("upstream"),
-        )?;
+        let upstream_url_to_clone = upstream_working_clone_url.unwrap_or_else(|| {
+            upstream_path_abs.to_string_lossy().to_string()
+        });
+        git::clone_remote(
+            &upstream_url_to_clone,
+            &subgit_data_path,
+            "upstream",
+        );
+        let upstream_working = Repository::open(subgit_data_path.join("upstream")).unwrap();
         git::disable_gc(&upstream_working);
         git::set_push_simple(&upstream_working);
 

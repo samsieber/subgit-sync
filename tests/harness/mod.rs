@@ -25,6 +25,20 @@ pub struct TestWrapper {
     downstream: ExtGit,
     upstream_sub_path: PathBuf,
     downstream_sub_path: PathBuf,
+    daemon: Option<GitDaemon>,
+}
+
+#[derive(Debug, Clone)]
+struct GitDaemon {
+    url: String,
+}
+
+impl GitDaemon {
+    pub fn new<P: AsRef<Path>, S: AsRef<str>>(path: P, name: S) -> GitDaemon {
+        GitDaemon {
+            url: format!("git://127.0.0.1/{}/upstream.git", path.as_ref().to_string_lossy()),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -76,7 +90,7 @@ impl TestWrapper {
         dest.pull().unwrap();
     }
 
-    fn new_instance<P : AsRef<Path>, S: FnOnce(&ExtGit) -> ()>(root: P, setup: S, subgit_eq: &str, extra: &[&str]) -> Result<TestWrapper, Box<Error>> {
+    fn new_instance<P : AsRef<Path>, S: FnOnce(&ExtGit) -> ()>(root: P, setup: S, subgit_eq: &str, extra: &[&str], git_daemon: Option<GitDaemon>) -> Result<TestWrapper, Box<Error>> {
         let d: &Path = root.as_ref();
         let up_bare = init_bare_repo("upstream.git", &d)?;
         let up = clone(&d, &up_bare)?;
@@ -119,6 +133,7 @@ impl TestWrapper {
             downstream: ExtGit { path: d.join("subgit") },
             upstream_sub_path: PathBuf::from(subgit_eq),
             downstream_sub_path: PathBuf::from(""),
+            daemon: git_daemon,
         };
 
         wrapper.do_then_verify(|_,_| {Ok(())});
@@ -126,18 +141,28 @@ impl TestWrapper {
         Ok(wrapper)
     }
 
-    pub fn new_adv<P : AsRef<str>, S: FnOnce(&ExtGit) -> (), A: FnOnce(&Path) -> Vec<String>>(name: P, setup: S, subgit_eq: &str, gen_args: A) -> Result<TestWrapper, Box<Error>> {
+    pub fn new_adv<P : AsRef<str>, S: FnOnce(&ExtGit) -> (), A: FnOnce(&Path, Option<String>) -> Vec<String>>
+    (name: P, setup: S, subgit_eq: &str, gen_args: A, use_daemon: bool) -> Result<TestWrapper, Box<Error>> {
         let root = test_dir(name.as_ref());
-        let extra = gen_args(&root);
+        let git_daemon = if use_daemon {
+            Some(GitDaemon::new(&root, &name.as_ref()))
+        } else {
+            None
+        };
+        let extra = gen_args(&root, git_daemon.as_ref().map(|gd| gd.url.clone()));
         let temp_log_path = root.clone().join("test_setup.log");
         let log_path = temp_log_path.to_string_lossy();
         let mut extra_args = vec!("-f", &log_path);
         extra.iter().for_each(|v| extra_args.push(v));
-        TestWrapper::new_instance(&root, setup, subgit_eq, &extra_args)
+        if let Some(ref gd) = git_daemon {
+            extra_args.push("-r");
+            extra_args.push(&gd.url);
+        }
+        TestWrapper::new_instance(&root, setup, subgit_eq, &extra_args, git_daemon.clone())
     }
 
     pub fn new<P : AsRef<str>, S: FnOnce(&ExtGit) -> ()>(name: P, setup: S, subgit_eq: &str) -> Result<TestWrapper, Box<Error>> {
-        TestWrapper::new_adv(name, setup, subgit_eq, |r| vec!())
+        TestWrapper::new_adv(name, setup, subgit_eq, |r, _| vec!(), true)
     }
 }
 
@@ -197,11 +222,9 @@ impl ExtGit {
 
     pub fn commit_count<S: AsRef<str>>(&self, commit_ish: S) -> Result<u32, Box<Error>> {
         let mut args = vec!["rev-list", "--count", &commit_ish.as_ref()];
-        let command_res = util::command_raw(&self.path, "git", args.iter())?;
-        let res_out = String::from_utf8((command_res).stdout).unwrap();
-        println!("--{}--", res_out);
+        let command_output = self.command_output(args)?;
         //Ok( String::from_utf8(command_res.stdout).unwrap())?.parse().unwrap())
-        Ok(res_out.trim().parse()?)
+        Ok(command_output.trim().parse()?)
     }
 
     pub fn command_output(&self, args: Vec<&str>) -> Result<String, Box<Error>> {

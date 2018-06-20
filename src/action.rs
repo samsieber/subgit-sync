@@ -57,6 +57,7 @@ pub struct Setup {
     // The hook paths
     pub upstream_hook_path: Option<PathBuf>,
     pub subgit_hook_path: Option<PathBuf>,
+    pub upstream_working_clone_url: Option<String>,
 }
 
 #[derive(Debug)]
@@ -125,6 +126,7 @@ impl Setup {
             },
             self.subgit_hook_path,
             self.upstream_hook_path,
+            self.upstream_working_clone_url,
         )?;
         wrapped.import_initial_empty_commits();
         wrapped.update_all_from_upstream()?;

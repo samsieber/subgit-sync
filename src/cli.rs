@@ -51,6 +51,8 @@ struct SetupRequest {
     upstream_hook_path: Option<String>,
     #[structopt(short = "S", long = "subgit_hook_path")]
     subgit_hook_path: Option<String>,
+    #[structopt(short = "r", long = "upstream_clone_url")]
+    upstream_clone_url: Option<String>,
 }
 
 impl SetupRequest {
@@ -68,6 +70,7 @@ impl SetupRequest {
 
             subgit_hook_path: self.subgit_hook_path.map(|v| PathBuf::from(v)),
             upstream_hook_path: self.upstream_hook_path.map(|v| PathBuf::from(v)),
+            upstream_working_clone_url: self.upstream_clone_url,
         }))
     }
 }

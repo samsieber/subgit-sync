@@ -182,6 +182,18 @@ pub fn get_n_recent_shas(repo: &Repository, n: usize) -> Vec<Oid> {
     }
 }
 
+pub fn clone_remote<S: AsRef<str>, P: AsRef<Path>>(url: S, parent: P, name: &str){
+    std::process::Command::new("git")
+        .arg("clone")
+        .arg(url.as_ref())
+        .arg(name)
+        .current_dir(parent.as_ref())
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+}
+
 pub fn push_sha_ext<S: AsRef<str>>(repo: &Repository, ref_name: S, force_push: bool, git_push_options: Option<Vec<String>>) -> Result<(), Box<Error>> {
     let mut process = std::process::Command::new("git");
     process
