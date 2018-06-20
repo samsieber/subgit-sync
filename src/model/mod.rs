@@ -228,27 +228,6 @@ impl WrappedSubGit {
         Ok(())
     }
 
-    pub fn create_or_fail<SP: AsRef<Path>, UP: AsRef<Path>>(
-        subgit_location: SP,
-        upstream_location: UP,
-        subdir_loc: &str,
-    ) -> Result<WrappedSubGit, Box<Error>> {
-        WrappedSubGit::run_creation(
-            subgit_location,
-            upstream_location,
-            subdir_loc,
-            None,
-            LevelFilter::Debug,
-            PathBuf::from("git_subgit_test_run.log"),
-            BinSource {
-                location: PathBuf::from("target/debug/subgit-rs"),
-                symlink: true,
-            },
-            None,
-            None,
-        )
-    }
-
     pub fn run_creation<SP: AsRef<Path>, UP: AsRef<Path>>(
         subgit_location: SP,
         upstream_location: UP,

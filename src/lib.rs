@@ -37,22 +37,3 @@ pub fn run() -> Result<(), Box<Error>> {
     let action = exec_env.parse_command(std::env::args())?;
     action.run()
 }
-
-pub fn run_import_test(id: &str, remote: &str, subdir: &str) -> Result<(), Box<Error>> {
-    let top = Path::new("data").join(id);
-    let subgit_path = top.join("subgit");
-    let upstream_path = top.join("upstream");
-
-    // Setup test data location, cleaning out old subgit
-    fs::create_dir_all(&top)?;
-    fs::remove_if_exists(&subgit_path)?;
-    fs::remove_if_exists(&upstream_path)?;
-    git::open_or_clone_bare(&upstream_path, remote);
-    fs::remove_if_exists(upstream_path.join("hooks").join("post-receive"))?;
-
-    let wrapped = model::WrappedSubGit::create_or_fail(subgit_path, upstream_path, subdir)?;
-
-    wrapped.update_all_from_upstream()?;
-
-    Ok(())
-}
