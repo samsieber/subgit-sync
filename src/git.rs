@@ -137,7 +137,9 @@ pub fn fetch_all_ext(repo: &Repository) -> Result<(), Box<Error>> {
         .env_clear()
         .env("PATH", std::env::var("PATH").unwrap());
     process.arg("fetch");
-    process.arg("--all");
+    process.arg("origin");
+    process.arg("+refs/heads/*:refs/heads/*");
+    process.arg("+refs/sync/*:refs/sync/*");
 
     process.current_dir(repo.workdir().unwrap());
 
