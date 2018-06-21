@@ -246,13 +246,13 @@ impl SyncAll {
 
 impl SyncRefs {
     pub fn run(self) -> RunResult {
-        super::util::fork_into_child();
-
         let wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
 
         if wrapped.should_abort_hook() {
             return Ok(());
         }
+
+        super::util::fork_into_child();
 
         info!("Opened Wrapped");
         lock(&wrapped.location)?;
