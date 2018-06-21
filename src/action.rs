@@ -51,6 +51,11 @@ pub enum RecursionDetection {
     EnvBased(EnvDetect),
 }
 
+pub struct RecursionStatus {
+    pub is_recursing: bool,
+    pub reason: String,
+}
+
 impl RecursionDetection {
     pub fn get_push_opts(&self) -> Option<Vec<String>>{
         info!("Using push opts from {:?}", &self);
@@ -61,14 +66,40 @@ impl RecursionDetection {
         }
     }
 
-    pub fn is_recursing(&self) -> bool {
+    pub fn detect_recursion(&self) -> RecursionStatus {
         match &self {
-            RecursionDetection::Disabled => false,
-            RecursionDetection::UsePushOptions => git::get_git_options().unwrap_or(vec!()).iter().any(|x| x == "IGNORE_SUBGIT_UPDATE"),
-            RecursionDetection::EnvBased(env_detect) => if let Ok(value) = env::var(&env_detect.name) {
-                value == env_detect.value
+            RecursionDetection::Disabled => RecursionStatus {
+                is_recursing: false,
+                reason: "Disabled".to_string(),
+            },
+            RecursionDetection::UsePushOptions =>  if git::get_git_options().unwrap_or(vec!()).iter().any(|x| x == "IGNORE_SUBGIT_UPDATE") {
+                RecursionStatus {
+                    is_recursing: true,
+                    reason: format!("Found 'IGNORE_SUBGIT_UPDATE' as a git push option env variable value")
+                }
             } else {
-                false
+                RecursionStatus {
+                    is_recursing: false,
+                    reason: format!("Didn't find 'IGNORE_SUBGIT_UPDATE' as a git push option env variable value")
+                }
+            },
+            RecursionDetection::EnvBased(env_detect) => if let Ok(value) = env::var(&env_detect.name) {
+                if value == env_detect.value {
+                    RecursionStatus {
+                        is_recursing: true,
+                        reason: format!("Found variable {} with value {}", env_detect.name, env_detect.value)
+                    }
+                } else {
+                    RecursionStatus {
+                        is_recursing: false,
+                        reason: format!("Found variable {} with value {} (needed {} as the value)", env_detect.name, value, env_detect.value)
+                    }
+                }
+            } else {
+                RecursionStatus {
+                    is_recursing: false,
+                    reason: format!("Didn't find an env variable named {}", env_detect.name)
+                }
             },
         }
     }

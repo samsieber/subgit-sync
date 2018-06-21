@@ -19,6 +19,7 @@ use simplelog::Config;
 use std::fs::File;
 use action::lock;
 use action::RecursionDetection;
+use action::RecursionStatus;
 
 pub struct WrappedSubGit {
     pub location: PathBuf,
@@ -62,7 +63,10 @@ impl WrappedSubGit {
     }
 
     pub fn should_abort_hook(&self) -> bool {
-        self.recursion_detection.is_recursing()
+        let status : RecursionStatus = self.recursion_detection.detect_recursion();
+        let status_str = if status.is_recursing { "Detected hook recursion" } else { "No hook recursion detected" };
+        info!("{} - {}", status_str, status.reason);
+        status.is_recursing
     }
 
     pub fn update_self(&self) {
