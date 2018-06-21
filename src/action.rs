@@ -141,33 +141,11 @@ pub struct UpdateHook {
 }
 
 #[derive(Debug)]
-pub struct RequestSync {
-    pub env: SubGitEnv,
-    pub stdin: Vec<u8>,
-}
-
-#[derive(Debug)]
 pub enum Action {
     SyncRefs(SyncRefs),
     SyncAll(SyncAll),
     Setup(Setup),
     UpdateHook(UpdateHook),
-    RequestSync(RequestSync),
-}
-
-impl RequestSync {
-    fn run(self) -> RunResult {
-        let mut child = Command::new(&self.env.hook_path)
-            .env_clear()
-            .env("PATH", env::var("PATH").unwrap())
-            .env("GIT_DIR",  self.env.hook_path.parent().unwrap().parent().unwrap().to_string_lossy().as_ref())
-            .stdin(Stdio::piped())
-            .arg("sync-refs")
-            .spawn()
-            .unwrap();
-        child.stdin.as_mut().expect("Could not get stdin for child sync-refs child process").write_all(&self.stdin).unwrap();
-        Ok(())
-    }
 }
 
 pub fn lock<P: AsRef<Path>>(root: P) -> RunResult{
@@ -281,7 +259,6 @@ impl Action {
             Action::UpdateHook(update) => update.run(),
             Action::SyncAll(sync_all) => sync_all.run(),
             Action::SyncRefs(sync_refs) => sync_refs.run(),
-            Action::RequestSync(request_sync) => request_sync.run(),
         }
     }
 }

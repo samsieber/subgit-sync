@@ -189,10 +189,36 @@ impl ExecEnv {
         I::Item: Into<OsString> + Clone,
     {
         match self {
-            ExecEnv::Upstream(env) => Ok(Action::RequestSync(action::RequestSync {
-                env,
-                stdin: read_to_string(&mut std::io::stdin()).into_bytes(),
-            })),
+            ExecEnv::Upstream(env) => {
+
+                let mut s = String::new();
+                std::io::stdin().read_to_string(&mut s).unwrap();
+
+                let reqs = s.lines().map(|v| v.trim()).map(|line| -> Result<action::RefSyncRequest, Box<Error>> {
+                    let entries = line.split(" ").collect::<Vec<&str>>();
+                    entries.iter().for_each(|v| println!("Value: {}", v));
+                    println!("OLD: {}", Oid::from_str(&entries[0])?);
+                    println!("OLD: {}", Oid::from_str(&entries[1])?);
+                    match entries[..] {
+                        [old_sha, new_sha, ref_name] => {
+                            println!("{} {} {}", old_sha, new_sha, ref_name);
+                            Ok(action::RefSyncRequest {
+                                ref_name: ref_name.to_string(),
+                                old_upstream_sha: Oid::from_str(old_sha)?,
+                                new_upstream_sha: Oid::from_str(new_sha)?,
+                            })
+                        },
+                        _ => Err(Box::new(StringError {
+                            message: "Bad args".to_owned()
+                        })),
+                    }
+                }).collect::<Result<Vec<action::RefSyncRequest>, Box<Error>>>()?;
+
+                Ok(Action::SyncRefs(action::SyncRefs {
+                    env,
+                    requests: reqs,
+                }))
+            }
             ExecEnv::Subgit(env) => {
                 let args: Vec<_> = iterable.into_iter().collect();
                 let string_args: Vec<String> = args.iter()
@@ -202,36 +228,6 @@ impl ExecEnv {
                 match args.len() {
                     2 => match string_args[1].as_str() {
                         "sync-all" => Ok(Action::SyncAll(action::SyncAll { env })),
-                        "sync-refs" => {
-
-                            let mut s = String::new();
-                            std::io::stdin().read_to_string(&mut s).unwrap();
-
-                            let reqs = s.lines().map(|v| v.trim()).map(|line| -> Result<action::RefSyncRequest, Box<Error>> {
-                                let entries = line.split(" ").collect::<Vec<&str>>();
-                                entries.iter().for_each(|v| println!("Value: {}", v));
-                                println!("OLD: {}", Oid::from_str(&entries[0])?);
-                                println!("OLD: {}", Oid::from_str(&entries[1])?);
-                                match entries[..] {
-                                    [old_sha, new_sha, ref_name] => {
-                                        println!("{} {} {}", old_sha, new_sha, ref_name);
-                                        Ok(action::RefSyncRequest {
-                                            ref_name: ref_name.to_string(),
-                                            old_upstream_sha: Oid::from_str(old_sha)?,
-                                            new_upstream_sha: Oid::from_str(new_sha)?,
-                                        })
-                                    },
-                                    _ => Err(Box::new(StringError {
-                                        message: "Bad args".to_owned()
-                                    })),
-                                }
-                            }).collect::<Result<Vec<action::RefSyncRequest>, Box<Error>>>()?;
-
-                            Ok(Action::SyncRefs(action::SyncRefs {
-                                env,
-                                requests: reqs,
-                            }))
-                        },
                         bad_arg => Err(Box::new(StringError {
                             message: format!("Invalid argument: '{}'", bad_arg).to_owned(),
                         })),
