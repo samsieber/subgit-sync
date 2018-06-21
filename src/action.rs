@@ -61,7 +61,7 @@ impl RecursionDetection {
         info!("Using push opts from {:?}", &self);
         match self {
             RecursionDetection::UsePushOptions => Some(vec!("IGNORE_SUBGIT_UPDATE".to_string())),
-            RecursionDetection::EnvBased(env_detect) => None,
+            RecursionDetection::EnvBased(_env_detect) => None,
             RecursionDetection::Disabled => None,
         }
     }

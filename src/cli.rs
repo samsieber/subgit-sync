@@ -148,38 +148,43 @@ fn read_to_string<R : Read>(readable: &mut R) -> String {
 impl ExecEnv {
     pub fn detect() -> ExecEnv {
         let git_os_dir = env::var_os("GIT_DIR");
+        let gl_username = env::var_os("GL_USERNAME");
+
+        let in_hook = git_os_dir.is_some() || gl_username.is_some();
+
+
 
 //        println!("Current Path: {:?}, Current Git DIR: {:?}", env::current_exe().unwrap(), git_os_dir);
 
-        match git_os_dir {
-            Some(git_os_path) => {
-                let git_path = canonicalize(git_os_path).expect("Cannot open the GIT_DIR");
-                if git_path.join("data").join(SETTINGS_FILE).is_file() {
-//                    eprintln!("In subgit repo");
-                    ExecEnv::Subgit(SubGitEnv {
-                        git_dir: git_path.clone(),
-                        hook_path: git_path.join("data").join("hook"),
-                    })
-                } else {
-//                    eprintln!("In upstream repo");
-                    let hook_path = find_subgit_from_hook().expect("Cannot follow symlink");
-                    let repo_path = hook_path.parent().unwrap().parent().unwrap();
-                    if !repo_path
-                        .join("data")
-                        .join(SETTINGS_FILE)
-                        .is_file()
-                    {
-                        panic!("Cannot find subgit path!");
-                    };
-                    ExecEnv::Upstream(SubGitEnv {
-                        git_dir: repo_path.to_owned(),
-                        hook_path: hook_path.to_owned(),
-                    })
-                }
+        if in_hook {
+            let cwd = if let Some(git_os_path) = git_os_dir {
+                PathBuf::from(git_os_path)
+            } else {
+                env::current_dir().unwrap()
+            };
+            let git_path = canonicalize(cwd).expect("Cannot open the GIT_DIR");
+            if git_path.join("data").join(SETTINGS_FILE).is_file() {
+                ExecEnv::Subgit(SubGitEnv {
+                    git_dir: git_path.clone(),
+                    hook_path: git_path.join("data").join("hook"),
+                })
+            } else {
+                let hook_path = find_subgit_from_hook().expect("Cannot follow symlink");
+                let repo_path = hook_path.parent().unwrap().parent().unwrap();
+                if !repo_path
+                    .join("data")
+                    .join(SETTINGS_FILE)
+                    .is_file()
+                {
+                    panic!("Cannot find subgit path!");
+                };
+                ExecEnv::Upstream(SubGitEnv {
+                    git_dir: repo_path.to_owned(),
+                    hook_path: hook_path.to_owned(),
+                })
             }
-            None => {
-                ExecEnv::Setup(env::current_exe().expect("Cannot read current executable path"))
-            }
+        } else {
+            ExecEnv::Setup(env::current_exe().expect("Cannot read current executable path"))
         }
     }
 
