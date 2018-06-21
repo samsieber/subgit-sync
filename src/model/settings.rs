@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use logging;
 use fs;
 use action::RecursionDetection;
+use log_panics;
 
 pub const SETTINGS_FILE : &str = "settings.json";
 
@@ -65,5 +66,6 @@ impl Settings {
             self.internal.file_log_level,
             &self.data_dir.join("logs").join("sync.log"),
         );
+        log_panics::init();
     }
 }

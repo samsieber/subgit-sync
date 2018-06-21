@@ -14,6 +14,7 @@ extern crate hex;
 extern crate simplelog;
 extern crate nix;
 extern crate libc;
+extern crate log_panics;
 
 use std::error::Error;
 use std::path::Path;
