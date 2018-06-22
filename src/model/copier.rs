@@ -141,19 +141,30 @@ impl<'a> Copier<'a> {
     pub fn copy_ref_unchecked(
         &'a self,
         ref_name: &str,
-        old_source_sha: Option<Oid>,
+        supposed_old_source_sha: Option<Oid>,
         new_source_sha: Option<Oid>,
         force_push: bool,
         git_push_opts: Option<Vec<String>>,
     ) -> Option<Oid> {
-        debug!("Copying ref {:?} {:?}", old_source_sha, new_source_sha);
-        if new_source_sha == old_source_sha {
-            return new_source_sha;
-        }
-
+        debug!("Copying ref {:?} {:?}", supposed_old_source_sha, new_source_sha);
         if new_source_sha == None {
             git::delete_remote_branch(self.dest.working, &ref_name,git_push_opts).expect("Could not remove remote reference!");
             return None;
+        }
+
+        let old_source_sha = supposed_old_source_sha.and_then(|source_sha| {
+            if self.mapper.get_translated(Some(source_sha), self.dest.name, self.source.name ).is_some() {
+                Some(source_sha)
+            } else {
+                self.dest.bare.find_reference(ref_name).ok().and_then(|reference| {
+                    let old_dest_sha = reference.peel_to_commit().unwrap().id();
+                    self.mapper.get_translated(Some(old_dest_sha), self.dest.name, self.source.name)
+                })
+            }
+        });
+
+        if new_source_sha == old_source_sha {
+            return new_source_sha;
         }
 
         let commits = self.get_unseen_source_commits_between(old_source_sha, &new_source_sha.unwrap()); //self.get_commits_to_import(old_upstream_sha, new_upstream_sha);
