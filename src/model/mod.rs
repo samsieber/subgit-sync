@@ -39,7 +39,7 @@ pub struct BinSource {
 }
 
 impl WrappedSubGit {
-    pub fn open<SP: AsRef<Path>>(subgit_location: SP) -> Result<Option<WrappedSubGit>, Box<Error>> {
+    pub fn open<SP: AsRef<Path>, F: FnOnce()>(subgit_location: SP, before_load: Option<F>) -> Result<Option<WrappedSubGit>, Box<Error>> {
         let subgit_top_path: &Path = subgit_location.as_ref();
         let subgit_data_path = subgit_top_path.join("data");
         info!("Loading settings");
@@ -52,6 +52,9 @@ impl WrappedSubGit {
         if git_settings.should_abort_hook() {
             Ok(None)
         } else {
+            if let Some(before_load_callback) = before_load {
+                before_load_callback();
+            }
             Ok(Some(WrappedSubGit {
                 location: subgit_top_path.to_owned(),
                 map: Repository::open(subgit_data_path.join("map")).expect("Cannot find map file"),

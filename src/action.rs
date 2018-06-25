@@ -184,9 +184,11 @@ impl Setup {
     }
 }
 
+fn empty(){}
+
 impl UpdateHook {
     pub fn run(self) -> RunResult {
-        let maybe_wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
+        let maybe_wrapped = ::model::WrappedSubGit::open(self.env.git_dir, Some(empty))?;
 
         if let Some(wrapped) = maybe_wrapped {
             info!("Opened Wrapped");
@@ -205,7 +207,7 @@ impl UpdateHook {
 
 impl SyncAll {
     pub fn run(self) -> RunResult {
-        let maybe_wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
+        let maybe_wrapped = ::model::WrappedSubGit::open(self.env.git_dir, Some(empty))?;
 
         if let Some(wrapped) = maybe_wrapped {
             info!("Opened Wrapped");
@@ -224,20 +226,18 @@ impl SyncAll {
 impl SyncRefs {
     pub fn run(self) -> RunResult {
 
-        let maybe_wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
+        let maybe_wrapped = ::model::WrappedSubGit::open(&self.env.git_dir, Some(|| {
+            let ref_names: Vec<_> = (&self.requests).iter()
+                .filter(|req| git::is_applicable(&req.ref_name))
+                .map(|req| &req.ref_name)
+                .collect();
 
-        if let Some(wrapped) = maybe_wrapped {
-            {
-                let ref_names: Vec<_> = self.requests.iter()
-                    .filter(|req| git::is_applicable(&req.ref_name))
-                    .map(|req| &req.ref_name)
-                    .collect();
-
-                println!("Syncing refs: {:?}", ref_names);
-            }
+            println!("Syncing refs: {:?}", ref_names);
 
             super::util::fork_into_child();
+        }))?;
 
+        if let Some(wrapped) = maybe_wrapped {
             info!("Opened Wrapped");
             lock(&wrapped.location)?;
             info!("Running Sync Refs");
