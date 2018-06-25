@@ -9,11 +9,11 @@ pub fn configure_logging<P: AsRef<Path>>(
     file_level: LevelFilter,
     file_path: &P,
 ) {
-    println!("Logging file path: {:?}", &file_path.as_ref().to_string_lossy());
+    info!("Logging file path: {:?}", &file_path.as_ref().to_string_lossy());
 
     let f = OpenOptions::new().create(true).append(true).open(file_path.as_ref()).unwrap();
 
-    println!("File created");
+    info!("File created");
     CombinedLogger::init(vec![
         SimpleLogger::new(stdout_level, Config::default()),
         WriteLogger::new(
@@ -22,5 +22,5 @@ pub fn configure_logging<P: AsRef<Path>>(
             f,
         ),
     ]).unwrap();
-    debug!("Logging started");
+    info!("Logging started");
 }

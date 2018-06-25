@@ -230,6 +230,15 @@ impl SyncRefs {
             return Ok(());
         }
 
+        {
+            let ref_names: Vec<_> = self.requests.iter()
+                .filter(|req| git::is_applicable(&req.ref_name))
+                .map(|req| &req.ref_name)
+                .collect();
+
+            println!("Syncing refs: {:?}", ref_names);
+        }
+
         super::util::fork_into_child();
 
         info!("Opened Wrapped");

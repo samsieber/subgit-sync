@@ -42,12 +42,12 @@ impl WrappedSubGit {
     pub fn open<SP: AsRef<Path>>(subgit_location: SP) -> Result<WrappedSubGit, Box<Error>> {
         let subgit_top_path: &Path = subgit_location.as_ref();
         let subgit_data_path = subgit_top_path.join("data");
-        println!("Loading settings");
+        info!("Loading settings");
         let git_settings = settings::Settings::load(&subgit_data_path);
-        println!("Loaded settings");
+        info!("Loaded settings");
 
         git_settings.setup_logging();
-        println!("Setup logging");
+        info!("Setup logging");
 
         Ok(WrappedSubGit {
             location: subgit_top_path.to_owned(),
@@ -80,7 +80,7 @@ impl WrappedSubGit {
         old_sha: Oid,
         new_sha: Oid,
     ) -> Result<(), Box<Error>> {
-        println!("Starting on hook!");
+        info!("Starting on hook!");
         if !git::is_applicable(&ref_name.as_ref()) {
             info!("Skipping non-applicable ref: {}", ref_name.as_ref());
             return Ok(());
@@ -96,11 +96,11 @@ impl WrappedSubGit {
             Some(new_sha)
         };
 
-        println!("Post option adjustment");
+        debug!("Post option adjustment");
 
         if new == None {
             //git::delete_remote_branch(&self.local_working, &ref_name, None)?;
-            println!("Deleting remote branch");
+            info!("Deleting remote branch");
             self.export_local_commits(ref_name.as_ref(), old, None);
             return Ok(());
         }
@@ -138,7 +138,9 @@ impl WrappedSubGit {
 
         info!("About to export commits");
 
-        self.export_local_commits(ref_name.as_ref(), old, Some(new_sha));
+        self.export_local_commits(&ref_name.as_ref(), old, Some(new_sha));
+
+        println!("Exported commits from {} upstream", ref_name.as_ref());
 
         Ok(())
     }

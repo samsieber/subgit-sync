@@ -201,12 +201,8 @@ impl ExecEnv {
 
                 let reqs = s.lines().map(|v| v.trim()).map(|line| -> Result<action::RefSyncRequest, Box<Error>> {
                     let entries = line.split(" ").collect::<Vec<&str>>();
-                    entries.iter().for_each(|v| println!("Value: {}", v));
-                    println!("OLD: {}", Oid::from_str(&entries[0])?);
-                    println!("OLD: {}", Oid::from_str(&entries[1])?);
                     match entries[..] {
                         [old_sha, new_sha, ref_name] => {
-                            println!("{} {} {}", old_sha, new_sha, ref_name);
                             Ok(action::RefSyncRequest {
                                 ref_name: ref_name.to_string(),
                                 old_upstream_sha: Oid::from_str(old_sha)?,
@@ -229,7 +225,7 @@ impl ExecEnv {
                 let string_args: Vec<String> = args.iter()
                     .map(|v| v.clone().into().to_string_lossy().into_owned())
                     .collect();
-                string_args.iter().for_each(|v| println!("Arg: {}", v));
+                string_args.iter().for_each(|v| debug!("Arg: {}", v));
                 match args.len() {
                     2 => match string_args[1].as_str() {
                         "sync-all" => Ok(Action::SyncAll(action::SyncAll { env })),
