@@ -39,7 +39,7 @@ pub struct BinSource {
 }
 
 impl WrappedSubGit {
-    pub fn open<SP: AsRef<Path>>(subgit_location: SP) -> Result<WrappedSubGit, Box<Error>> {
+    pub fn open<SP: AsRef<Path>>(subgit_location: SP) -> Result<Option<WrappedSubGit>, Box<Error>> {
         let subgit_top_path: &Path = subgit_location.as_ref();
         let subgit_data_path = subgit_top_path.join("data");
         info!("Loading settings");
@@ -49,17 +49,21 @@ impl WrappedSubGit {
         git_settings.setup_logging();
         info!("Setup logging");
 
-        Ok(WrappedSubGit {
-            location: subgit_top_path.to_owned(),
-            map: Repository::open(subgit_data_path.join("map")).expect("Cannot find map file"),
-            upstream_working: Repository::open(subgit_data_path.join("upstream"))?,
-            upstream_bare: Repository::open(subgit_data_path.join("upstream.git"))?,
-            upstream_path: git_settings.upstream_path(),
-            local_working: Repository::open(subgit_data_path.join("local"))?,
-            local_bare: Repository::open(subgit_data_path.join("local.git"))?,
-            local_path: git_settings.local_path(),
-            recursion_detection: git_settings.recursion_detection(),
-        })
+        if git_settings.should_abort_hook() {
+            Ok(None)
+        } else {
+            Ok(Some(WrappedSubGit {
+                location: subgit_top_path.to_owned(),
+                map: Repository::open(subgit_data_path.join("map")).expect("Cannot find map file"),
+                upstream_working: Repository::open(subgit_data_path.join("upstream"))?,
+                upstream_bare: Repository::open(subgit_data_path.join("upstream.git"))?,
+                upstream_path: git_settings.upstream_path(),
+                local_working: Repository::open(subgit_data_path.join("local"))?,
+                local_bare: Repository::open(subgit_data_path.join("local.git"))?,
+                local_path: git_settings.local_path(),
+                recursion_detection: git_settings.recursion_detection(),
+            }))
+        }
     }
 
     pub fn should_abort_hook(&self) -> bool {

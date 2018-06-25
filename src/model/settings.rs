@@ -5,6 +5,7 @@ use logging;
 use fs;
 use action::RecursionDetection;
 use log_panics;
+use action::RecursionStatus;
 
 pub const SETTINGS_FILE : &str = "settings.json";
 
@@ -39,6 +40,13 @@ impl Settings {
                 recursion_detection: recursion_detection,
             }).unwrap(),
         );
+    }
+
+    pub fn should_abort_hook(&self) -> bool {
+        let status : RecursionStatus = self.recursion_detection().detect_recursion();
+        let status_str = if status.is_recursing { "Detected hook recursion" } else { "No hook recursion detected" };
+        info!("{} - {}", status_str, status.reason);
+        status.is_recursing
     }
 
     pub fn recursion_detection(&self) -> RecursionDetection { self.internal.recursion_detection.clone() }

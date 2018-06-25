@@ -186,77 +186,77 @@ impl Setup {
 
 impl UpdateHook {
     pub fn run(self) -> RunResult {
-        let wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
+        let maybe_wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
 
-        if wrapped.should_abort_hook() {
-            return Ok(());
+        if let Some(wrapped) = maybe_wrapped {
+            info!("Opened Wrapped");
+            lock(&wrapped.location)?;
+            info!("Running update");
+            wrapped.update_self();
+            wrapped.push_ref_change_upstream(self.ref_name, self.old_sha, self.new_sha)?;
+
+            Ok(())
+        } else {
+            Ok(())
         }
-
-        info!("Opened Wrapped");
-        lock(&wrapped.location)?;
-        info!("Running update");
-        wrapped.update_self();
-        wrapped.push_ref_change_upstream(self.ref_name, self.old_sha, self.new_sha)?;
-
-        Ok(())
     }
 }
 
 
 impl SyncAll {
     pub fn run(self) -> RunResult {
-        let wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
+        let maybe_wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
 
-        if wrapped.should_abort_hook() {
-            return Ok(());
+        if let Some(wrapped) = maybe_wrapped {
+            info!("Opened Wrapped");
+            lock(&wrapped.location)?;
+            info!("Running Sync All");
+
+            wrapped.update_self();
+            wrapped.update_all_from_upstream()?;
+            Ok(())
+        } else {
+            Ok(())
         }
-
-        info!("Opened Wrapped");
-        lock(&wrapped.location)?;
-        info!("Running Sync All");
-
-        wrapped.update_self();
-        wrapped.update_all_from_upstream()?;
-
-        Ok(())
     }
 }
 
 impl SyncRefs {
     pub fn run(self) -> RunResult {
-        let wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
 
-        if wrapped.should_abort_hook() {
-            return Ok(());
-        }
+        let maybe_wrapped = ::model::WrappedSubGit::open(self.env.git_dir)?;
 
-        {
-            let ref_names: Vec<_> = self.requests.iter()
+        if let Some(wrapped) = maybe_wrapped {
+            {
+                let ref_names: Vec<_> = self.requests.iter()
+                    .filter(|req| git::is_applicable(&req.ref_name))
+                    .map(|req| &req.ref_name)
+                    .collect();
+
+                println!("Syncing refs: {:?}", ref_names);
+            }
+
+            super::util::fork_into_child();
+
+            info!("Opened Wrapped");
+            lock(&wrapped.location)?;
+            info!("Running Sync Refs");
+
+            wrapped.update_self();
+            self.requests.into_iter()
                 .filter(|req| git::is_applicable(&req.ref_name))
-                .map(|req| &req.ref_name)
-                .collect();
+                .for_each(|request| {
+                    wrapped.import_upstream_commits(
+                        &request.ref_name,
+                        git::optionify_sha(request.old_upstream_sha),
+                        git::optionify_sha(request.new_upstream_sha),
+                    );
+                });
 
-            println!("Syncing refs: {:?}", ref_names);
+            Ok(())
+        } else {
+            Ok(())
         }
-
-        super::util::fork_into_child();
-
-        info!("Opened Wrapped");
-        lock(&wrapped.location)?;
-        info!("Running Sync Refs");
-
-        wrapped.update_self();
-        self.requests.into_iter()
-            .filter(|req| git::is_applicable(&req.ref_name))
-            .for_each(|request| {
-                wrapped.import_upstream_commits(
-                    &request.ref_name,
-                    git::optionify_sha(request.old_upstream_sha),
-                    git::optionify_sha(request.new_upstream_sha),
-                );
-            });
-
-        Ok(())
     }
 }
 
