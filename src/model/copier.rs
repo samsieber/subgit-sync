@@ -5,6 +5,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::fs;
 use git;
+use action::PushListener;
 
 pub struct GitLocation<'a> {
     pub location: &'a Path,
@@ -138,17 +139,24 @@ impl<'a> Copier<'a> {
         }
     }
 
-    pub fn copy_ref_unchecked(
+    pub fn copy_ref_unchecked<PL: PushListener>(
         &'a self,
         ref_name: &str,
         supposed_old_source_sha: Option<Oid>,
         new_source_sha: Option<Oid>,
         force_push: bool,
         git_push_opts: Option<Vec<String>>,
+        push_listener: Option<PL>,
     ) -> Option<Oid> {
         debug!("Copying ref {:?} {:?}", supposed_old_source_sha, new_source_sha);
         if new_source_sha == None {
+            if let Some(pl) = &push_listener {
+                pl.pre_push(&ref_name, git::no_sha());
+            }
             git::delete_remote_branch(self.dest.working, &ref_name,git_push_opts).expect("Could not remove remote reference!");
+            if let Some(pl) = &push_listener {
+                pl.post_push(&ref_name, git::no_sha());
+            }
             return None;
         }
 
@@ -195,7 +203,13 @@ impl<'a> Copier<'a> {
 
         debug!("Source was {}, now assigning to {} in dest", &new_source_sha.unwrap(), &new_sha);
 
+        if let Some(pl) = &push_listener {
+            pl.pre_push(&ref_name, new_sha);
+        }
         let res = git::push_sha_ext(&self.dest.working, ref_name, force_push, git_push_opts);
+        if let Some(pl) = &push_listener {
+            pl.post_push(&ref_name, new_sha);
+        }
 
         match &res {
             Ok(_) => (),

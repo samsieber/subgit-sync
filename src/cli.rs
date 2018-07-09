@@ -14,6 +14,7 @@ use util::StringError;
 use action::EnvDetect;
 use model::settings::SETTINGS_FILE;
 use structopt::clap::AppSettings;
+use make_absolute;
 
 pub enum ExecEnv {
     Subgit(SubGitEnv),
@@ -102,27 +103,29 @@ struct SetupRequest {
 
     /// Specify an external url to push changes to, when import commits in the subgit from the upstream
     /// If not set, uses a modified subgit bare repo that bypasses the server hooks
-    #[structopt(short = "u", long = "subgit_working_clone_url", conflicts_with = "disable_recursion_detection")]
+    #[structopt(short = "u", long = "subgit_working_clone_url")]
     subgit_working_clone_url: Option<String>,
 
     /// Specifies an environment variable name and value to look for when trying to detect recursive hook calls
     /// Defaults to using the --push-option added in git 2.10
     /// The value must be in the form of ENV_NAME:ENV_VALUE
     /// For example, for gitlab servers, you'd most likely use 'GL_USERNAME:git' as the value
-    #[structopt(short = "r", long = "env_based_recursion_detection", parse(from_str = "parse_env_base_recursion_detection"))]
+    #[structopt(short = "r", long = "env_based_recursion_detection", conflicts_with = "use_whitelist_recursion_detection", parse(from_str = "parse_env_base_recursion_detection"))]
     env_based_recursion_detection: Option<EnvDetect>,
 
     /// Disables recursive hook call checking
     /// This cannot be used with a custom subgit_working_clone_url due to the infinite recursion that occurs
     /// when both the upstream hook and subgit hook are triggered during synchronization
-    #[structopt(short = "d", long = "disable_recursion_detection", conflicts_with = "subgit_working_clone_url")]
+    #[structopt(short = "w", long = "use_whitelist_recursion_detection", conflicts_with = "env_based_recursion_detection")]
     disable_recursion_detection: bool,
 }
 
 impl SetupRequest {
     fn convert(self, copy_from: PathBuf) -> Result<Action, Box<Error>> {
         let recursion_detection = if self.disable_recursion_detection {
-            action::RecursionDetection::Disabled
+            action::RecursionDetection::UpdateWhitelist(action::UpdateWhitelist{
+                path: make_absolute(PathBuf::from(&self.subgit_git_location).join("data").join("whitelist")).unwrap()
+            })
         } else {
             match self.env_based_recursion_detection {
                 Some(env_detect) => action::RecursionDetection::EnvBased(env_detect),

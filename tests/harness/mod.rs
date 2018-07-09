@@ -219,7 +219,7 @@ impl TestWrapper {
             extra_args.push(&gd.upstream);
 //            extra_args.push("-u");
 //            extra_args.push(&gd.subgit);
-            extra_args.push("-d");
+            extra_args.push("-w");
         }
         TestWrapper::new_instance(&root, setup, subgit_eq, &extra_args, git_daemon.clone())
     }
@@ -366,7 +366,7 @@ where P: AsRef<Path>, K: AsRef<Path>, V: AsRef<[u8]>, F: IntoIterator<Item=(K,V)
     process.arg(&local_bare.as_path().to_string_lossy().as_ref());
     process.arg("-f");
     process.arg(&d.join("test_setup.log"));
-    process.arg("-d");
+    process.arg("-w");
     process.arg("sub");
     process.env("RUST_BACKTRACE", "1");
 

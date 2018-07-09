@@ -31,6 +31,7 @@ pub struct WrappedSubGit {
     pub local_bare: Repository,
     pub local_path: String,
     pub recursion_detection: RecursionDetection,
+    pub lock: File,
 }
 
 pub struct BinSource {
@@ -55,6 +56,7 @@ impl WrappedSubGit {
             if let Some(before_load_callback) = before_load {
                 before_load_callback();
             }
+            info!("Opened Wrapped");
             Ok(Some(WrappedSubGit {
                 location: subgit_top_path.to_owned(),
                 map: Repository::open(subgit_data_path.join("map")).expect("Cannot find map file"),
@@ -65,6 +67,7 @@ impl WrappedSubGit {
                 local_bare: Repository::open(subgit_data_path.join("local.git"))?,
                 local_path: git_settings.local_path(),
                 recursion_detection: git_settings.recursion_detection(),
+                lock: lock(&subgit_top_path).unwrap(),
             }))
         }
     }
@@ -161,7 +164,7 @@ impl WrappedSubGit {
     ) -> Option<Oid> {
         let sha_copier = self.get_exporter();
 
-        sha_copier.copy_ref_unchecked(ref_name, old_local_sha, new_local_sha, false, self.recursion_detection.get_push_opts())
+        sha_copier.copy_ref_unchecked(ref_name, old_local_sha, new_local_sha, false, self.recursion_detection.get_push_opts(), None::<&RecursionDetection>)
     }
 
     pub fn import_upstream_commits(
@@ -172,7 +175,7 @@ impl WrappedSubGit {
     ) -> Option<Oid> {
         let sha_copier = self.get_importer();
 
-        sha_copier.copy_ref_unchecked(ref_name, old_upstream_sha, new_upstream_sha, true, self.recursion_detection.get_push_opts())
+        sha_copier.copy_ref_unchecked(ref_name, old_upstream_sha, new_upstream_sha, true, self.recursion_detection.get_push_opts(), Some(&self.recursion_detection))
     }
 
     fn get_importer<'a>(&'a self) -> copier::Copier<'a>{
@@ -387,10 +390,13 @@ impl WrappedSubGit {
             recursion_detection.clone(),
         );
 
+        info!("Generating whitelist directory");
+        fs::create_dir_all(&subgit_data_path.join("whitelist")).expect("Could not create whitelist folder");
+
         info!("Generating lock file");
         { File::create(&subgit_data_path.join("lock"))?; }
         info!("Preparing to lock");
-        lock(&subgit_location)?;
+        let lock = lock(&subgit_location)?;
 
         info!("Copying hook file");
         let hook_path = subgit_location.as_ref().join("data").join("hook");
@@ -415,6 +421,7 @@ impl WrappedSubGit {
             local_bare: Repository::open_bare(subgit_data_path.join("local.git"))?,
             local_path: subgit_map_path.unwrap_or("").to_owned(),
             recursion_detection,
+            lock,
         })
     }
 }
