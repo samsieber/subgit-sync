@@ -38,7 +38,7 @@ pub struct SyncAll {
     pub env: SubGitEnv,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct EnvDetect {
     pub name: String,
     pub value: String,

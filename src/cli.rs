@@ -41,6 +41,18 @@ fn parse_env_base_recursion_detection(input: &&str) -> EnvDetect {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        assert_eq!(
+            super::parse_env_base_recursion_detection(&"GL_USERNAME:git"),
+            super::EnvDetect {
+                name: "GL_USERNAME".to_string(),
+                value: "git".to_string(),
+            });
+    }
+}
 
 /// Installs git hooks to republish a path of repository (henceforth: upstream)
 /// as it's own top-level repository (henceforth: subgit) and synchronize commits between them,
