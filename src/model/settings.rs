@@ -15,6 +15,7 @@ struct SettingsFile {
     subgit_path: String,
     file_log_level: LevelFilter,
     recursion_detection: RecursionDetection,
+    filters: Vec<String>,
 }
 
 pub struct Settings {
@@ -29,15 +30,17 @@ impl Settings {
         subgit_path: String,
         file_log_level: LevelFilter,
         recursion_detection: RecursionDetection,
+        filters: Vec<String>,
     ) {
         let data_dir = path.as_ref();
         fs::write_content_to_file(
             &data_dir.join(SETTINGS_FILE),
             &serde_json::to_string_pretty(&SettingsFile {
-                upstream_path: upstream_path,
-                subgit_path: subgit_path,
-                file_log_level: file_log_level,
-                recursion_detection: recursion_detection,
+                upstream_path,
+                subgit_path,
+                file_log_level,
+                recursion_detection,
+                filters,
             }).unwrap(),
         );
     }
@@ -57,6 +60,10 @@ impl Settings {
 
     pub fn local_path(&self) -> String {
         self.internal.subgit_path.clone()
+    }
+
+    pub fn filters(&self) -> Vec<String> {
+        self.internal.filters.clone()
     }
 
     pub fn load<P: AsRef<Path>>(path: P) -> Settings {

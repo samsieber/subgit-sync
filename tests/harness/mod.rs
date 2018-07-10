@@ -179,8 +179,6 @@ impl TestWrapper {
         process.env("RUST_BACKTRACE", "1");
 
         let res : ExitStatus = process.spawn().unwrap().wait().unwrap();
-        assert!(res.success());
-
         let local = clone(&d, &local_bare)?;
 
         set_credentials(&local_bare);

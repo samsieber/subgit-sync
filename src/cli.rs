@@ -42,6 +42,11 @@ fn parse_env_base_recursion_detection(input: &&str) -> EnvDetect {
     }
 }
 
+fn str_to_vec(input: String) -> Vec<String> {
+    let mut iter = input.split(",");
+    iter.map(|v| v.to_owned()).collect()
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -118,6 +123,10 @@ struct SetupRequest {
     /// when both the upstream hook and subgit hook are triggered during synchronization
     #[structopt(short = "w", long = "use_whitelist_recursion_detection", conflicts_with = "env_based_recursion_detection")]
     disable_recursion_detection: bool,
+
+    /// Only operate on the refs that start with these values - pass in a comma separated list
+    #[structopt(short = "m", long = "match_ref", default_value = "refs/heads/,HEAD")]
+    match_ref: String,
 }
 
 impl SetupRequest {
@@ -150,6 +159,8 @@ impl SetupRequest {
             upstream_working_clone_url: self.upstream_working_clone_url,
 
             recursion_detection,
+
+            filters: str_to_vec(self.match_ref),
         }))
     }
 }

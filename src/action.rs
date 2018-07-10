@@ -16,6 +16,22 @@ use hex;
 
 pub type RunResult = Result<(), Box<Error>>;
 
+pub trait RefFilter {
+    fn matches<R: AsRef<str>>(&self, ref_name: R) -> bool;
+}
+
+impl RefFilter for Vec<String> {
+    fn matches<R: AsRef<str>>(&self, ref_name: R) -> bool {
+        self.iter().any(|v| ref_name.as_ref().starts_with(v))
+    }
+}
+
+impl <'a> RefFilter for &'a Vec<String> {
+    fn matches<R: AsRef<str>>(&self, ref_name: R) -> bool {
+        self.iter().any(|v| ref_name.as_ref().starts_with(v))
+    }
+}
+
 #[derive(Debug)]
 pub struct SubGitEnv {
     pub git_dir: PathBuf,
@@ -203,6 +219,9 @@ pub struct Setup {
 
     // recursion detection
     pub recursion_detection: RecursionDetection,
+
+    // ref matching
+    pub filters: Vec<String>
 }
 
 #[derive(Debug)]
@@ -249,6 +268,7 @@ impl Setup {
             self.upstream_hook_path,
             self.upstream_working_clone_url,
             self.recursion_detection,
+            self.filters,
         )?;
         wrapped.import_initial_empty_commits();
         wrapped.update_all_from_upstream()?;
@@ -257,7 +277,7 @@ impl Setup {
     }
 }
 
-fn empty(){}
+fn empty(filters: &Vec<String>){}
 
 impl UpdateHook {
     pub fn run(self) -> RunResult {
@@ -296,9 +316,9 @@ impl SyncAll {
 impl SyncRefs {
     pub fn run(self) -> RunResult {
 
-        let maybe_wrapped = ::model::WrappedSubGit::open(&self.env.git_dir, Some(|| {
+        let maybe_wrapped = ::model::WrappedSubGit::open(&self.env.git_dir, Some(|filters : &Vec<String>| {
             let ref_names: Vec<_> = (&self.requests).iter()
-                .filter(|req| git::is_applicable(&req.ref_name))
+                .filter(|req| filters.matches(&req.ref_name))
                 .map(|req| &req.ref_name)
                 .collect();
 
@@ -312,7 +332,7 @@ impl SyncRefs {
 
             wrapped.update_self();
             self.requests.into_iter()
-                .filter(|req| git::is_applicable(&req.ref_name))
+                .filter(|req| wrapped.filters.matches(&req.ref_name))
                 .for_each(|request| {
                     wrapped.import_upstream_commits(
                         &request.ref_name,

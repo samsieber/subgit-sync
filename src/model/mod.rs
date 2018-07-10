@@ -20,6 +20,7 @@ use std::fs::File;
 use action::lock;
 use action::RecursionDetection;
 use action::RecursionStatus;
+use action::RefFilter;
 
 pub struct WrappedSubGit {
     pub location: PathBuf,
@@ -31,6 +32,7 @@ pub struct WrappedSubGit {
     pub local_bare: Repository,
     pub local_path: String,
     pub recursion_detection: RecursionDetection,
+    pub filters: Vec<String>,
     pub lock: File,
 }
 
@@ -40,7 +42,7 @@ pub struct BinSource {
 }
 
 impl WrappedSubGit {
-    pub fn open<SP: AsRef<Path>, F: FnOnce()>(subgit_location: SP, before_load: Option<F>) -> Result<Option<WrappedSubGit>, Box<Error>> {
+    pub fn open<SP: AsRef<Path>, F: FnOnce(&Vec<String>)>(subgit_location: SP, before_load: Option<F>) -> Result<Option<WrappedSubGit>, Box<Error>> {
         let subgit_top_path: &Path = subgit_location.as_ref();
         let subgit_data_path = subgit_top_path.join("data");
         info!("Loading settings");
@@ -54,7 +56,7 @@ impl WrappedSubGit {
             Ok(None)
         } else {
             if let Some(before_load_callback) = before_load {
-                before_load_callback();
+                before_load_callback(&git_settings.filters());
             }
             info!("Opened Wrapped");
             Ok(Some(WrappedSubGit {
@@ -67,6 +69,7 @@ impl WrappedSubGit {
                 local_bare: Repository::open(subgit_data_path.join("local.git"))?,
                 local_path: git_settings.local_path(),
                 recursion_detection: git_settings.recursion_detection(),
+                filters: git_settings.filters(),
                 lock: lock(&subgit_top_path).unwrap(),
             }))
         }
@@ -91,7 +94,7 @@ impl WrappedSubGit {
         new_sha: Oid,
     ) -> Result<(), Box<Error>> {
         info!("Starting on hook!");
-        if !git::is_applicable(&ref_name.as_ref()) {
+        if !self.filters.matches(&ref_name) {
             info!("Skipping non-applicable ref: {}", ref_name.as_ref());
             return Ok(());
         }
@@ -226,14 +229,14 @@ impl WrappedSubGit {
         let mut local_refs: std::collections::HashMap<String, git2::Oid> =
             git::get_refs(&self.local_bare, "**")?
                 .into_iter()
-                .filter(|&(ref name, ref _target)| git::is_applicable(&name))
+                .filter(|&(ref name, ref _target)| self.filters.matches(&name))
                 .collect();
 
         let mapper = map::CommitMapper { map: &self.map };
 
         git::get_refs(&self.upstream_bare, "**")?
             .into_iter()
-            .filter(|&(ref name, ref _target)| git::is_applicable(&name))
+            .filter(|&(ref name, ref _target)| self.filters.matches(&name))
             .for_each(|(ref_name, upstream_sha)| {
                 info!("Importing {}", ref_name);
                 let local_sha = local_refs.remove(&ref_name);
@@ -264,6 +267,7 @@ impl WrappedSubGit {
         upstream_hook_path: PathBuf,
         upstream_working_clone_url: Option<String>,
         recursion_detection: RecursionDetection,
+        filters: Vec<String>,
     ) -> Result<WrappedSubGit, Box<Error>> {
         WriteLogger::init(
             LevelFilter::Debug,
@@ -388,6 +392,7 @@ impl WrappedSubGit {
             subgit_map_path.unwrap_or("").to_owned(),
             log_level,
             recursion_detection.clone(),
+            filters.clone(),
         );
 
         info!("Generating whitelist directory");
@@ -421,6 +426,7 @@ impl WrappedSubGit {
             local_bare: Repository::open_bare(subgit_data_path.join("local.git"))?,
             local_path: subgit_map_path.unwrap_or("").to_owned(),
             recursion_detection,
+            filters,
             lock,
         })
     }
