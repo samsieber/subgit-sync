@@ -43,7 +43,7 @@ fn parse_env_base_recursion_detection(input: &&str) -> EnvDetect {
 }
 
 fn str_to_vec(input: String) -> Vec<String> {
-    let mut iter = input.split(",");
+    let iter = input.split(",");
     iter.map(|v| v.to_owned()).collect()
 }
 
@@ -165,6 +165,7 @@ impl SetupRequest {
     }
 }
 
+#[allow(unused)]
 fn read_to_string<R : Read>(readable: &mut R) -> String {
     let mut s = String::new();
     readable.read_to_string(&mut s).unwrap();

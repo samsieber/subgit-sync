@@ -19,8 +19,8 @@ pub fn import_good_ref_but_not_bad_refs() {
         upstream.push().unwrap();
 
 
-        let HEAD = upstream.command_output(vec!("rev-parse", "HEAD")).unwrap().trim().to_owned();
-        upstream.checkout(HEAD).unwrap();
+        let head = upstream.command_output(vec!("rev-parse", "HEAD")).unwrap().trim().to_owned();
+        upstream.checkout(head).unwrap();
 
         upstream.update_working(vec![
             FileAction::overwrite("sub/again.txt", "Hello world (from upstream again)"),
@@ -53,9 +53,9 @@ pub fn upstream_push_good_ref_but_not_bad_refs() {
         upstream.push().unwrap();
     }, "sub").unwrap();
 
-    test.do_then_verify(|upstream, downstream| {
-        let HEAD = upstream.command_output(vec!("rev-parse", "HEAD")).unwrap().trim().to_owned();
-        upstream.checkout(HEAD).unwrap();
+    test.do_then_verify(|upstream, _downstream| {
+        let head = upstream.command_output(vec!("rev-parse", "HEAD")).unwrap().trim().to_owned();
+        upstream.checkout(head).unwrap();
 
         upstream.update_working(vec![
             FileAction::overwrite("sub/again.txt", "Hello world (from upstream again)"),
@@ -93,9 +93,9 @@ pub fn downstream_push_good_ref_but_not_bad_refs() {
         upstream.push().unwrap();
     }, "sub").unwrap();
 
-    test.do_then_verify(|upstream, downstream| {
-        let HEAD = downstream.command_output(vec!("rev-parse", "HEAD")).unwrap().trim().to_owned();
-        downstream.checkout(HEAD).unwrap();
+    test.do_then_verify(|_upstream, downstream| {
+        let head = downstream.command_output(vec!("rev-parse", "HEAD")).unwrap().trim().to_owned();
+        downstream.checkout(head).unwrap();
 
         downstream.update_working(vec![
             FileAction::overwrite("again.txt", "Hello world (from downstream)"),

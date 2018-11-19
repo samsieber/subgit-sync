@@ -97,9 +97,4 @@ To translate a commit from one repository to the other, the following logic is u
  The mapping is stored on disk as a key-value store. 
  Given a sha, one can look up the corresponding upstream or mirror file which contains the sha it maps to in the other repository.
  It's a repo so that if we run into errors while copying commits, we can reset the state back to the HEAD.
- 
- ## To Do 
- * Add support for more branches / repos - maybe add a filter in the data file?
- * Create an empty ref in the upstream for orphaned branches in the subgit (so those don't break the script)
- * Implement many, many tests
   

@@ -9,6 +9,7 @@ use std::io::Write;
 
 pub use std::fs::{copy, create_dir, create_dir_all, remove_dir_all};
 
+#[allow(unused)]
 pub fn remove_if_exists<P: AsRef<Path>>(path: P) -> Result<(), Box<Error>> {
     if symlink_metadata(path.as_ref()).is_ok() {
         remove_dir_all(&path)?;

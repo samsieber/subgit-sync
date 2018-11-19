@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::path::PathBuf;
 use std::path::Path;
 use std;
@@ -36,7 +38,7 @@ pub struct TestWrapper {
 }
 
 #[derive(Debug, Clone)]
-struct GitDaemon {
+pub struct GitDaemon {
     upstream: String,
     subgit: String,
 }
@@ -285,7 +287,7 @@ impl ExtGit {
     }
 
     pub fn commit_count<S: AsRef<str>>(&self, commit_ish: S) -> Result<u32, Box<Error>> {
-        let mut args = vec!["rev-list", "--count", &commit_ish.as_ref()];
+        let args = vec!["rev-list", "--count", &commit_ish.as_ref()];
         let command_output = self.command_output(args)?;
         //Ok( String::from_utf8(command_res.stdout).unwrap())?.parse().unwrap())
         Ok(command_output.trim().parse()?)

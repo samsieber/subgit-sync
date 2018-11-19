@@ -4,13 +4,9 @@ use std::error::Error;
 use std::fs::File;
 use fs2::FileExt;
 use git2::Oid;
-use std::process::Command;
 use std::env;
 use git;
-use std::process::Stdio;
-use std::io::Write;
 use std::path::Path;
-use action::RecursionDetection::EnvBased;
 use std::fs;
 use hex;
 
@@ -94,7 +90,7 @@ fn get_file_name<N: AsRef<str>>(ref_name: N, sha: Oid) -> String{
 }
 
 impl UpdateWhitelist {
-    pub fn getHandle<N: AsRef<str>>(&self, ref_name: N, sha: Oid) -> PathBuf {
+    pub fn get_handle<N: AsRef<str>>(&self, ref_name: N, sha: Oid) -> PathBuf {
         return self.path.join(get_file_name(ref_name, sha));
     }
 }
@@ -103,7 +99,7 @@ impl <'a> PushListener for &'a RecursionDetection {
     fn pre_push<S: AsRef<str>>(&self, ref_name: S, sha: Oid) {
         match self {
             RecursionDetection::UpdateWhitelist(update_whitelist) => {
-                let handle = update_whitelist.getHandle(ref_name, sha);
+                let handle = update_whitelist.get_handle(ref_name, sha);
                 info!("Creating whitelist file for recursion detection: {}", &handle.to_string_lossy());
                 File::create(handle).unwrap();
             },
@@ -114,7 +110,7 @@ impl <'a> PushListener for &'a RecursionDetection {
     fn post_push<S: AsRef<str>>(&self, ref_name: S, sha: Oid) {
         match self {
             RecursionDetection::UpdateWhitelist(update_whitelist) => {
-                let handle = update_whitelist.getHandle(ref_name, sha);
+                let handle = update_whitelist.get_handle(ref_name, sha);
                 fs::remove_file(handle).unwrap();
             },
             _ => {}
@@ -171,7 +167,7 @@ impl RecursionDetection {
             &RecursionDetection::UpdateWhitelist(ref whitelist) => {
                 if let Some(new_sha) = env::args().nth(3) {
                     let ref_name = env::args().nth(1).unwrap();
-                    let path = whitelist.getHandle(ref_name, Oid::from_str(&new_sha).unwrap_or(git::no_sha()));
+                    let path = whitelist.get_handle(ref_name, Oid::from_str(&new_sha).unwrap_or(git::no_sha()));
                     if path.exists(){
                         RecursionStatus {
                             is_recursing: true,
@@ -277,7 +273,7 @@ impl Setup {
     }
 }
 
-fn empty(filters: &Vec<String>){}
+fn empty(_filters: &Vec<String>){}
 
 impl UpdateHook {
     pub fn run(self) -> RunResult {

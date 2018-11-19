@@ -2,7 +2,6 @@
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
 extern crate structopt;
 
 extern crate serde;
@@ -17,7 +16,6 @@ extern crate libc;
 extern crate log_panics;
 
 use std::error::Error;
-use std::path::Path;
 
 mod model;
 mod fs;

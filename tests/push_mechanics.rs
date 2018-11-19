@@ -96,7 +96,7 @@ pub fn delete_branch_from_downstream() {
         upstream.push().unwrap();
     }, "sub").unwrap();
 
-    test.do_then_verify(|upstream, downstream| {
+    test.do_then_verify(|upstream, _downstream| {
         upstream.checkout("HEAD~").unwrap();
 
         upstream.update_working(vec![
@@ -112,7 +112,7 @@ pub fn delete_branch_from_downstream() {
         Ok(())
     });
 
-    test.do_then_verify(|upstream, downstream| {
+    test.do_then_verify(|_upstream, downstream| {
         downstream.push_adv(vec!("origin", ":to_delete"))?;
         Ok(())
     });
@@ -145,7 +145,7 @@ pub fn delete_branch_from_upstream() {
         upstream.push().unwrap();
     }, "sub").unwrap();
 
-    test.do_then_verify(|upstream, downstream| {
+    test.do_then_verify(|upstream, _downstream| {
         upstream.checkout("HEAD~").unwrap();
 
         upstream.update_working(vec![

@@ -1,4 +1,4 @@
-use git2::{Commit, ObjectType, Oid, Repository, Signature, Sort};
+use git2::{Commit, Oid, Repository, Signature, Sort};
 use git2;
 use std::error::Error;
 use std::path::Path;
@@ -42,6 +42,7 @@ pub fn reverse_topological_time() -> Sort {
     Sort::from_bits(bits).unwrap()
 }
 
+#[allow(unused)]
 pub fn open_or_clone_bare<P: AsRef<Path>>(path: P, url: &str) -> Repository {
     match Repository::open_bare(&path) {
         Ok(repo) => repo,
@@ -293,6 +294,7 @@ pub fn get_refs(repo: &Repository, glob: &str) -> Result<Vec<(String, Oid)>, Box
     ref_list
 }
 
+#[allow(unused)]
 pub fn is_applicable<S: AsRef<str>>(value: &S) -> bool {
     value.as_ref().starts_with("refs/heads") || value.as_ref() == "HEAD"
 //    !value.as_ref().starts_with("refs/tags")

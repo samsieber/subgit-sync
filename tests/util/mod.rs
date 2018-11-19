@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::path::{PathBuf, Path};
 use std::fs::{remove_dir_all, create_dir_all};
 use util;
