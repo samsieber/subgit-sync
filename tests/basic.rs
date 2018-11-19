@@ -8,8 +8,8 @@ extern crate simplelog;
 mod util;
 mod harness;
 
-use util::*;
-use harness::*;
+use crate::util::*;
+use crate::harness::*;
 
 #[test]
 fn modify_modify_modify() {

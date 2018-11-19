@@ -25,11 +25,11 @@ mod cli;
 mod util;
 mod git;
 
-pub use model::WrappedSubGit;
-pub use util::fork_into_child;
-pub use model::BinSource;
-pub use util::StringError;
-pub use fs::make_absolute;
+pub use crate::model::WrappedSubGit;
+pub use crate::util::fork_into_child;
+pub use crate::model::BinSource;
+pub use crate::util::StringError;
+pub use crate::fs::make_absolute;
 
 pub fn run() -> Result<(), Box<Error>> {
     let exec_env = cli::ExecEnv::detect();

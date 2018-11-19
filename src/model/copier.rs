@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::fs;
-use git;
-use action::PushListener;
+use crate::git;
+use crate::action::PushListener;
 
 pub struct GitLocation<'a> {
     pub location: &'a Path,

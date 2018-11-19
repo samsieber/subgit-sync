@@ -5,7 +5,7 @@ use std::fs::File;
 use fs2::FileExt;
 use git2::Oid;
 use std::env;
-use git;
+use crate::git;
 use std::path::Path;
 use std::fs;
 use hex;
@@ -237,7 +237,7 @@ pub enum Action {
 }
 
 pub fn lock<P: AsRef<Path>>(root: P) -> Result<File, Box<Error>>{
-    info!("Trying to lock on {:?}", ::fs::make_absolute(&root.as_ref().join("data/lock")));
+    info!("Trying to lock on {:?}", crate::fs::make_absolute(&root.as_ref().join("data/lock")));
     let file = fs::OpenOptions::new().read(true).open(root.as_ref().join("data/lock"))?;
     file.lock_exclusive()?;
     info!("Locked!");
@@ -248,14 +248,14 @@ impl Setup {
     fn run(self) -> RunResult {
         let subgit_map_path = self.subgit_map_path
             .map(|v| v.to_string_lossy().to_string());
-        let wrapped = ::model::WrappedSubGit::run_creation(
+        let wrapped = crate::model::WrappedSubGit::run_creation(
             self.subgit_git_location,
             self.upstream_git_location,
             self.upstream_map_path.to_str().unwrap(),
             subgit_map_path.as_ref().map(String::as_str),
             self.log_level,
             self.log_file,
-            ::model::BinSource {
+            crate::model::BinSource {
                 location: self.copy_from,
                 symlink: false,
             },
@@ -277,7 +277,7 @@ fn empty(_filters: &Vec<String>){}
 
 impl UpdateHook {
     pub fn run(self) -> RunResult {
-        let maybe_wrapped = ::model::WrappedSubGit::open(self.env.git_dir, Some(empty))?;
+        let maybe_wrapped = crate::model::WrappedSubGit::open(self.env.git_dir, Some(empty))?;
 
         if let Some(wrapped) = maybe_wrapped {
             info!("Opened Wrapped");
@@ -295,7 +295,7 @@ impl UpdateHook {
 
 impl SyncAll {
     pub fn run(self) -> RunResult {
-        let maybe_wrapped = ::model::WrappedSubGit::open(self.env.git_dir, Some(empty))?;
+        let maybe_wrapped = crate::model::WrappedSubGit::open(self.env.git_dir, Some(empty))?;
 
         if let Some(wrapped) = maybe_wrapped {
             info!("Running Sync All");
@@ -312,7 +312,7 @@ impl SyncAll {
 impl SyncRefs {
     pub fn run(self) -> RunResult {
 
-        let maybe_wrapped = ::model::WrappedSubGit::open(&self.env.git_dir, Some(|filters : &Vec<String>| {
+        let maybe_wrapped = crate::model::WrappedSubGit::open(&self.env.git_dir, Some(|filters : &Vec<String>| {
             let ref_names: Vec<_> = (&self.requests).iter()
                 .filter(|req| filters.matches(&req.ref_name))
                 .map(|req| &req.ref_name)

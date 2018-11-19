@@ -2,7 +2,7 @@ use git2::{Oid, Repository};
 use std::str;
 use std::path::Path;
 use hex;
-use fs;
+use crate::fs;
 
 pub struct CommitMapper<'a> {
     pub map: &'a Repository,

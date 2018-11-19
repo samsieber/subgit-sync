@@ -7,14 +7,14 @@ use std;
 use std::io::Read;
 use log::LevelFilter;
 use structopt::StructOpt;
-use action::{Action, SubGitEnv};
+use crate::action::{Action, SubGitEnv};
 use git2::Oid;
-use action;
-use util::StringError;
-use action::EnvDetect;
-use model::settings::SETTINGS_FILE;
+use crate::action;
+use crate::util::StringError;
+use crate::action::EnvDetect;
+use crate::model::settings::SETTINGS_FILE;
 use structopt::clap::AppSettings;
-use make_absolute;
+use crate::make_absolute;
 
 pub enum ExecEnv {
     Subgit(SubGitEnv),

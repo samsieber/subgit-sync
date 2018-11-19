@@ -3,7 +3,7 @@ use git2;
 use std::error::Error;
 use std::path::Path;
 use std;
-use util::StringError;
+use crate::util::StringError;
 
 pub fn get_git_options() -> Option<Vec<String>> {
     std::env::var_os("GIT_PUSH_OPTION_COUNT").map(|v| {

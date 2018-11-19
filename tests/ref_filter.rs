@@ -5,7 +5,7 @@ extern crate simplelog;
 mod harness;
 mod util;
 
-use harness::*;
+use crate::harness::*;
 use std::time::Duration;
 
 #[test]

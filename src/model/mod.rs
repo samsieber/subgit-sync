@@ -4,23 +4,23 @@ use std;
 use std::error::Error;
 use git2;
 
-use fs;
-use git;
-use util;
+use crate::fs;
+use crate::git;
+use crate::util;
 
 mod map;
 mod copier;
 pub mod settings;
 
 use log::LevelFilter;
-use model::map::CommitMapper;
+use crate::model::map::CommitMapper;
 use simplelog::WriteLogger;
 use simplelog::Config;
 use std::fs::File;
-use action::lock;
-use action::RecursionDetection;
-use action::RecursionStatus;
-use action::RefFilter;
+use crate::action::lock;
+use crate::action::RecursionDetection;
+use crate::action::RecursionStatus;
+use crate::action::RefFilter;
 
 pub struct WrappedSubGit {
     pub location: PathBuf,

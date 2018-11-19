@@ -2,7 +2,6 @@
 
 use std::path::{PathBuf, Path};
 use std::fs::{remove_dir_all, create_dir_all};
-use util;
 use std::error::Error;
 use std;
 use std::ffi::OsStr;
@@ -38,7 +37,7 @@ pub fn test_dir(path: &str) -> PathBuf {
 }
 
 pub fn init_bare_repo<P: AsRef<Path>>(name: &str, parent: P) -> Result<PathBuf, Box<Error>> {
-    util::command(&parent, "git", ["init", "--bare", name].iter())?;
+    command(&parent, "git", ["init", "--bare", name].iter())?;
     Ok(PathBuf::from(format!("{}/{}", parent.as_ref().to_string_lossy(), name)))
 }
 
@@ -47,7 +46,7 @@ pub fn clone<P: AsRef<Path>, CWD: AsRef<Path>>(cwd: CWD, p: P) -> Res<PathBuf>{
     let fp = fps.split("/").last().unwrap();
     let name = fp.split(".").nth(0).unwrap();
     let full_path = format!("file://{}", make_absolute(p.as_ref())?.to_string_lossy());
-    util::command(&cwd, "git", &["clone", &full_path])?;
+    command(&cwd, "git", &["clone", &full_path])?;
     Ok(cwd.as_ref().join(name).to_owned())
 }
 
@@ -62,7 +61,7 @@ pub fn assert_contents_equal<P1: AsRef<Path>, P2: AsRef<Path>, R1: AsRef<Path>, 
 }
 
 pub fn assert_dir_content_equal<D1: AsRef<Path>, D2: AsRef<Path>>(origin: D1, comp: D2) {
-    let raw = util::command_raw(
+    let raw = command_raw(
         std::env::current_dir().unwrap(),
         "diff",
         ["--exclude=.git", &origin.as_ref().to_string_lossy(), &comp.as_ref().to_string_lossy()].iter()
@@ -71,8 +70,8 @@ pub fn assert_dir_content_equal<D1: AsRef<Path>, D2: AsRef<Path>>(origin: D1, co
 }
 
 pub fn set_credentials<P: AsRef<Path>>(path: P){
-    util::command(&path.as_ref(), "git", ["config", "user.name", "test user"].iter()).unwrap();
-    util::command(&path.as_ref(), "git", ["config", "user.email", "test@example.com"].iter()).unwrap();
+    command(&path.as_ref(), "git", ["config", "user.name", "test user"].iter()).unwrap();
+    command(&path.as_ref(), "git", ["config", "user.email", "test@example.com"].iter()).unwrap();
 }
 
 pub fn command<P, C, I, S>(path: P, command: C, args: I) -> Result<(), Box<Error>>

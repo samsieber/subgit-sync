@@ -5,7 +5,7 @@ extern crate simplelog;
 mod harness;
 mod util;
 
-use harness::*;
+use crate::harness::*;
 
 #[test]
 pub fn import_single_a_commit() {
