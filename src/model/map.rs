@@ -1,8 +1,8 @@
-use git2::{Oid, Repository};
-use std::str;
-use std::path::Path;
-use hex;
 use crate::fs;
+use git2::{Oid, Repository};
+use hex;
+use std::path::Path;
+use std::str;
 
 pub struct CommitMapper<'a> {
     pub map: &'a Repository,
@@ -29,7 +29,8 @@ fn sha_path(sha: &Oid) -> String {
 
 impl<'a> CommitMapper<'a> {
     fn workdir(&self) -> &Path {
-        &self.map
+        &self
+            .map
             .workdir()
             .expect("The map repo must have a workdir")
     }
@@ -46,9 +47,9 @@ impl<'a> CommitMapper<'a> {
         };
         let partial_path = sha_path(sha);
         let full_path = format!("{}_to_{}/{}", source.as_ref(), dest.as_ref(), partial_path);
-        let content = fs::content_of_file_if_exists(&fs::make_absolute(&self.workdir())
-            .unwrap()
-            .join(full_path));
+        let content = fs::content_of_file_if_exists(
+            &fs::make_absolute(&self.workdir()).unwrap().join(full_path),
+        );
         content.map(|oid_str| {
             Oid::from_bytes(&hex::decode(oid_str).unwrap())
                 .expect("The format should be correct for a stored sha")

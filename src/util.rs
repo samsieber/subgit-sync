@@ -1,6 +1,6 @@
+use libc;
 use std::error;
 use std::fmt;
-use libc;
 
 #[derive(Debug)]
 pub struct StringError {

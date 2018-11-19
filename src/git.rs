@@ -1,17 +1,24 @@
-use git2::{Commit, Oid, Repository, Signature, Sort};
+use crate::util::StringError;
 use git2;
+use git2::{Commit, Oid, Repository, Signature, Sort};
+use std;
 use std::error::Error;
 use std::path::Path;
-use std;
-use crate::util::StringError;
 
 pub fn get_git_options() -> Option<Vec<String>> {
     std::env::var_os("GIT_PUSH_OPTION_COUNT").map(|v| {
-        let git_opt_count = v.into_string().expect("GIT_PUSH_OPTION_COUNT is unreadable").parse::<u32>().expect("GIT_PUSH_OPTION_COUNT is supposed to be a env variable that's a number");
+        let git_opt_count = v
+            .into_string()
+            .expect("GIT_PUSH_OPTION_COUNT is unreadable")
+            .parse::<u32>()
+            .expect("GIT_PUSH_OPTION_COUNT is supposed to be a env variable that's a number");
 
-        (0..git_opt_count).map(|i|
-            std::env::var(&format!("GIT_PUSH_OPTION_{}", i)).expect(&format!("GIT_PUSH_OPTION_{} was unreadable", i))
-        ).collect::<Vec<String>>()
+        (0..git_opt_count)
+            .map(|i| {
+                std::env::var(&format!("GIT_PUSH_OPTION_{}", i))
+                    .expect(&format!("GIT_PUSH_OPTION_{} was unreadable", i))
+            })
+            .collect::<Vec<String>>()
     })
 }
 
@@ -69,7 +76,7 @@ pub fn disable_gc(repo: &Repository) {
     config.set_i32("gc.auto", 0).unwrap();
 }
 
-pub fn set_push_simple(repo: &Repository){
+pub fn set_push_simple(repo: &Repository) {
     let mut config = repo.config().unwrap();
     config.set_str("push.default", "simple").unwrap();
 }
@@ -100,7 +107,10 @@ fn find_earliest_commit_on_folder(repo: &Repository, target: &str) -> Option<Oid
         let full = std::str::from_utf8(&result.stdout).unwrap();
         let oids = full.trim();
         info!("OIDS text: '{}'", &oids);
-        oids.split('\n').filter(|v| !v.is_empty()).nth(0).map(|v| Oid::from_str(v).unwrap())
+        oids.split('\n')
+            .filter(|v| !v.is_empty())
+            .nth(0)
+            .map(|v| Oid::from_str(v).unwrap())
     }
 }
 
@@ -149,7 +159,13 @@ pub fn fetch_all_ext(repo: &Repository) -> Result<(), Box<Error>> {
     let result = process.output()?;
 
     if !result.status.success() {
-        return Err(Box::new(StringError { message: format!("Could not fetch all- exit code was {}. Full result of fetch: {}", &result.status, String::from_utf8(result.stderr)?) }));
+        return Err(Box::new(StringError {
+            message: format!(
+                "Could not fetch all- exit code was {}. Full result of fetch: {}",
+                &result.status,
+                String::from_utf8(result.stderr)?
+            ),
+        }));
     }
 
     Ok(())
@@ -174,18 +190,25 @@ pub fn get_n_recent_shas(repo: &Repository, n: usize) -> Vec<Oid> {
     let result = process.output().expect("Could not lookup recent commits");
 
     if !result.status.success() {
-        panic!("Could not fetch all- exit code was {}. Full result of fetch: {}", &result.status, String::from_utf8(result.stderr).unwrap());
+        panic!(
+            "Could not fetch all- exit code was {}. Full result of fetch: {}",
+            &result.status,
+            String::from_utf8(result.stderr).unwrap()
+        );
     } else {
         let full = std::str::from_utf8(&result.stdout).unwrap().trim();
-//        let mut oids : Vec<Oid> =
-            full.split('\n').filter(|v| !v.is_empty()).map(|v| Oid::from_str(v).unwrap()).collect()
-//            ;
-//        oids.push(repo.head().unwrap().peel_to_commit().unwrap().id());
-//        oids
+        //        let mut oids : Vec<Oid> =
+        full.split('\n')
+            .filter(|v| !v.is_empty())
+            .map(|v| Oid::from_str(v).unwrap())
+            .collect()
+        //            ;
+        //        oids.push(repo.head().unwrap().peel_to_commit().unwrap().id());
+        //        oids
     }
 }
 
-pub fn clone_remote<S: AsRef<str>, P: AsRef<Path>>(url: S, parent: P, name: &str){
+pub fn clone_remote<S: AsRef<str>, P: AsRef<Path>>(url: S, parent: P, name: &str) {
     std::process::Command::new("git")
         .arg("clone")
         .arg(url.as_ref())
@@ -197,7 +220,12 @@ pub fn clone_remote<S: AsRef<str>, P: AsRef<Path>>(url: S, parent: P, name: &str
         .unwrap();
 }
 
-pub fn push_sha_ext<S: AsRef<str>>(repo: &Repository, ref_name: S, force_push: bool, git_push_options: Option<Vec<String>>) -> Result<(), Box<Error>> {
+pub fn push_sha_ext<S: AsRef<str>>(
+    repo: &Repository,
+    ref_name: S,
+    force_push: bool,
+    git_push_options: Option<Vec<String>>,
+) -> Result<(), Box<Error>> {
     let mut process = std::process::Command::new("git");
     process
         .env_clear()
@@ -221,18 +249,32 @@ pub fn push_sha_ext<S: AsRef<str>>(repo: &Repository, ref_name: S, force_push: b
 
     process.current_dir(repo.workdir().unwrap());
 
-    info!("Pushing 'HEAD:{}' from {:?}", ref_name.as_ref(), repo.workdir());
+    info!(
+        "Pushing 'HEAD:{}' from {:?}",
+        ref_name.as_ref(),
+        repo.workdir()
+    );
 
     let result = process.output()?;
 
     if !result.status.success() {
-        return Err(Box::new(StringError { message: format!("Could not push - exit code was {}. Full result of push: {}", &result.status, String::from_utf8(result.stderr)?) }));
+        return Err(Box::new(StringError {
+            message: format!(
+                "Could not push - exit code was {}. Full result of push: {}",
+                &result.status,
+                String::from_utf8(result.stderr)?
+            ),
+        }));
     }
 
     Ok(())
 }
 
-pub fn delete_remote_branch<S: AsRef<str>>(repo: &Repository, ref_name: S, git_push_options: Option<Vec<String>>) -> Result<(), Box<Error>> {
+pub fn delete_remote_branch<S: AsRef<str>>(
+    repo: &Repository,
+    ref_name: S,
+    git_push_options: Option<Vec<String>>,
+) -> Result<(), Box<Error>> {
     let mut process = std::process::Command::new("git");
     process
         .env_clear()
@@ -254,7 +296,13 @@ pub fn delete_remote_branch<S: AsRef<str>>(repo: &Repository, ref_name: S, git_p
     let result = process.output()?;
 
     if !result.status.success() {
-        return Err(Box::new(StringError { message: format!("Could not push - exit code was {}. Full result of push: {}", &result.status, String::from_utf8(result.stderr)?) }));
+        return Err(Box::new(StringError {
+            message: format!(
+                "Could not push - exit code was {}. Full result of push: {}",
+                &result.status,
+                String::from_utf8(result.stderr)?
+            ),
+        }));
     }
 
     Ok(())
@@ -282,7 +330,8 @@ pub fn commit_empty(
 }
 
 pub fn get_refs(repo: &Repository, glob: &str) -> Result<Vec<(String, Oid)>, Box<Error>> {
-    let ref_list: Result<Vec<(String, Oid)>, _> = repo.references_glob(glob)?
+    let ref_list: Result<Vec<(String, Oid)>, _> = repo
+        .references_glob(glob)?
         .map(|r| {
             let rr = r?;
             Ok((
@@ -297,5 +346,5 @@ pub fn get_refs(repo: &Repository, glob: &str) -> Result<Vec<(String, Oid)>, Box
 #[allow(unused)]
 pub fn is_applicable<S: AsRef<str>>(value: &S) -> bool {
     value.as_ref().starts_with("refs/heads") || value.as_ref() == "HEAD"
-//    !value.as_ref().starts_with("refs/tags")
+    //    !value.as_ref().starts_with("refs/tags")
 }

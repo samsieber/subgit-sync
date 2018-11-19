@@ -1,11 +1,14 @@
-use git2::{Commit, Delta, Index, IndexAddOption, ObjectType, Oid, Repository, build::CheckoutBuilder, ResetType};
 use super::map::CommitMapper;
-use std::path::{Path, PathBuf};
+use crate::action::PushListener;
+use crate::git;
+use git2::{
+    build::CheckoutBuilder, Commit, Delta, Index, IndexAddOption, ObjectType, Oid, Repository,
+    ResetType,
+};
+use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::fs;
-use crate::git;
-use crate::action::PushListener;
+use std::path::{Path, PathBuf};
 
 pub struct GitLocation<'a> {
     pub location: &'a Path,
@@ -26,7 +29,8 @@ impl<'a> GitLocation<'a> {
     }
 
     fn workdir(&self) -> &Path {
-        &self.working
+        &self
+            .working
             .workdir()
             .expect("The map repo must have a workdir")
     }
@@ -37,8 +41,12 @@ impl<'a> GitLocation<'a> {
         dest_sha_inclusive: &Oid,
     ) -> Vec<Oid> {
         let walker = &mut self.bare.revwalk().unwrap();
-        starting_shas.iter().for_each(|v| info!("Using {} as a base commit to exclude", v));
-        starting_shas.into_iter().for_each(|starting_sha| walker.hide(starting_sha).unwrap());
+        starting_shas
+            .iter()
+            .for_each(|v| info!("Using {} as a base commit to exclude", v));
+        starting_shas
+            .into_iter()
+            .for_each(|starting_sha| walker.hide(starting_sha).unwrap());
         walker.push(*dest_sha_inclusive).unwrap();
         walker.set_sorting(git::reverse_topological());
         let res: Result<Vec<Oid>, _> = walker.collect();
@@ -73,20 +81,35 @@ fn dedup_vec<Item: Eq>(items: &mut Vec<Item>) {
 }
 
 impl<'a> Copier<'a> {
-
     fn get_unseen_source_commits_between(
         &self,
         maybe_starting_sha: Option<Oid>,
         dest_sha_inclusive: &Oid,
     ) -> Vec<Oid> {
-        debug!("Finding commits in {} between {:?} and {:?}", self.source.bare.path().to_string_lossy(), maybe_starting_sha, dest_sha_inclusive);
+        debug!(
+            "Finding commits in {} between {:?} and {:?}",
+            self.source.bare.path().to_string_lossy(),
+            maybe_starting_sha,
+            dest_sha_inclusive
+        );
         if let Some(starting_sha) = maybe_starting_sha {
             self.source
-                .get_commits_between(vec!(starting_sha), dest_sha_inclusive)
+                .get_commits_between(vec![starting_sha], dest_sha_inclusive)
         } else {
-            let mut starting_shas : Vec<Oid> = git::get_n_recent_shas(self.dest.bare, 10);
-            starting_shas.push(self.dest.working.find_reference("HEAD").unwrap().peel_to_commit().unwrap().id());
-            starting_shas = starting_shas.iter().map(|sha| self.get_source_sha(sha)).collect();
+            let mut starting_shas: Vec<Oid> = git::get_n_recent_shas(self.dest.bare, 10);
+            starting_shas.push(
+                self.dest
+                    .working
+                    .find_reference("HEAD")
+                    .unwrap()
+                    .peel_to_commit()
+                    .unwrap()
+                    .id(),
+            );
+            starting_shas = starting_shas
+                .iter()
+                .map(|sha| self.get_source_sha(sha))
+                .collect();
             self.source
                 .get_commits_between(starting_shas, dest_sha_inclusive)
         }
@@ -98,7 +121,10 @@ impl<'a> Copier<'a> {
     }
 
     fn record_sha_update(&'a self, source_sha: &Oid, dest_sha: Oid) -> Oid {
-        info!("Mapping {} <-> {} ({} <-> {})", source_sha, dest_sha, self.source.name, self.dest.name);
+        info!(
+            "Mapping {} <-> {} ({} <-> {})",
+            source_sha, dest_sha, self.source.name, self.dest.name
+        );
         self.mapper
             .set_translated(source_sha, self.source.name, self.dest.name, &dest_sha);
         self.mapper
@@ -127,15 +153,28 @@ impl<'a> Copier<'a> {
             .unwrap()
     }
 
-    pub fn import_initial_empty_commits(&'a self){
-        let commits_to_import = git::find_safe_empty_na_commits(self.source.bare, self.source.location.to_string_lossy().as_ref());
+    pub fn import_initial_empty_commits(&'a self) {
+        let commits_to_import = git::find_safe_empty_na_commits(
+            self.source.bare,
+            self.source.location.to_string_lossy().as_ref(),
+        );
         if let Some(first_oid) = commits_to_import.first() {
             info!("Importing {} empty commits", commits_to_import.len());
             let empty_dest_sha = self.empty_sha();
             commits_to_import.iter().for_each(|empty_source_sha| {
-                self.mapper.set_translated(empty_source_sha, self.source.name, self.dest.name, &empty_dest_sha);
+                self.mapper.set_translated(
+                    empty_source_sha,
+                    self.source.name,
+                    self.dest.name,
+                    &empty_dest_sha,
+                );
             });
-            self.mapper.set_translated(&empty_dest_sha, self.dest.name, self.source.name, first_oid);
+            self.mapper.set_translated(
+                &empty_dest_sha,
+                self.dest.name,
+                self.source.name,
+                first_oid,
+            );
         }
     }
 
@@ -148,12 +187,16 @@ impl<'a> Copier<'a> {
         git_push_opts: Option<Vec<String>>,
         push_listener: Option<PL>,
     ) -> Option<Oid> {
-        debug!("Copying ref {:?} {:?}", supposed_old_source_sha, new_source_sha);
+        debug!(
+            "Copying ref {:?} {:?}",
+            supposed_old_source_sha, new_source_sha
+        );
         if new_source_sha == None {
             if let Some(pl) = &push_listener {
                 pl.pre_push(&ref_name, git::no_sha());
             }
-            git::delete_remote_branch(self.dest.working, &ref_name,git_push_opts).expect("Could not remove remote reference!");
+            git::delete_remote_branch(self.dest.working, &ref_name, git_push_opts)
+                .expect("Could not remove remote reference!");
             if let Some(pl) = &push_listener {
                 pl.post_push(&ref_name, git::no_sha());
             }
@@ -161,13 +204,25 @@ impl<'a> Copier<'a> {
         }
 
         let old_source_sha = supposed_old_source_sha.and_then(|source_sha| {
-            if self.mapper.get_translated(Some(source_sha), self.dest.name, self.source.name ).is_some() {
+            if self
+                .mapper
+                .get_translated(Some(source_sha), self.dest.name, self.source.name)
+                .is_some()
+            {
                 Some(source_sha)
             } else {
-                self.dest.bare.find_reference(ref_name).ok().and_then(|reference| {
-                    let old_dest_sha = reference.peel_to_commit().unwrap().id();
-                    self.mapper.get_translated(Some(old_dest_sha), self.dest.name, self.source.name)
-                })
+                self.dest
+                    .bare
+                    .find_reference(ref_name)
+                    .ok()
+                    .and_then(|reference| {
+                        let old_dest_sha = reference.peel_to_commit().unwrap().id();
+                        self.mapper.get_translated(
+                            Some(old_dest_sha),
+                            self.dest.name,
+                            self.source.name,
+                        )
+                    })
             }
         });
 
@@ -175,21 +230,29 @@ impl<'a> Copier<'a> {
             return new_source_sha;
         }
 
-        let commits = self.get_unseen_source_commits_between(old_source_sha, &new_source_sha.unwrap()); //self.get_commits_to_import(old_upstream_sha, new_upstream_sha);
+        let commits =
+            self.get_unseen_source_commits_between(old_source_sha, &new_source_sha.unwrap()); //self.get_commits_to_import(old_upstream_sha, new_upstream_sha);
 
         let total_commits = commits.len();
         let mut current_commit = 0;
 
-        debug!("Need to import {} commits for {}", &total_commits, &ref_name);
+        debug!(
+            "Need to import {} commits for {}",
+            &total_commits, &ref_name
+        );
 
-        commits.into_iter()
+        commits
+            .into_iter()
             .filter(|&oid| {
                 current_commit += 1;
-                if !self.mapper.has_sha(&oid, self.source.name, self.dest.name){
+                if !self.mapper.has_sha(&oid, self.source.name, self.dest.name) {
                     debug!("Copying Commit ({}/{})", &current_commit, &total_commits);
                     true
                 } else {
-                    debug!("Skipping Commit ({}/{}) - already imported", &current_commit, &total_commits);
+                    debug!(
+                        "Skipping Commit ({}/{}) - already imported",
+                        &current_commit, &total_commits
+                    );
                     false
                 }
             })
@@ -199,9 +262,20 @@ impl<'a> Copier<'a> {
 
         debug!("Copied commits - now copying branch");
         let new_sha = self.get_dest_sha(&new_source_sha.unwrap());
-        self.dest.working.reset(&self.dest.working.find_object(new_sha, None).unwrap(), ResetType::Hard, None).unwrap();
+        self.dest
+            .working
+            .reset(
+                &self.dest.working.find_object(new_sha, None).unwrap(),
+                ResetType::Hard,
+                None,
+            )
+            .unwrap();
 
-        debug!("Source was {}, now assigning to {} in dest", &new_source_sha.unwrap(), &new_sha);
+        debug!(
+            "Source was {}, now assigning to {} in dest",
+            &new_source_sha.unwrap(),
+            &new_sha
+        );
 
         if let Some(pl) = &push_listener {
             pl.pre_push(&ref_name, new_sha);
@@ -213,7 +287,7 @@ impl<'a> Copier<'a> {
 
         match &res {
             Ok(_) => (),
-            Err(err) => eprint!("{}", &err)
+            Err(err) => eprint!("{}", &err),
         };
 
         res.unwrap();
@@ -222,9 +296,13 @@ impl<'a> Copier<'a> {
     }
 
     pub fn copy_commit(&'a self, source_sha: &Oid) -> Oid {
-        debug!("Copying commit {} from '{}' to '{}'", source_sha, self.source.name, self.dest.name);
+        debug!(
+            "Copying commit {} from '{}' to '{}'",
+            source_sha, self.source.name, self.dest.name
+        );
         // Get the source parents
-        let source_commit = self.source
+        let source_commit = self
+            .source
             .bare
             .find_commit(*source_sha)
             .expect(&format!("Couldn't find commit specified! {}", source_sha));
@@ -240,7 +318,10 @@ impl<'a> Copier<'a> {
         dedup_vec(&mut dest_parent_commit_shas);
         // use the empty commit as a parent if there would be not parents otherwise
         if dest_parent_commit_shas.is_empty() {
-            debug!("Adding empty commit as dest commit parent: {}", self.empty_sha());
+            debug!(
+                "Adding empty commit as dest commit parent: {}",
+                self.empty_sha()
+            );
             dest_parent_commit_shas.push(self.empty_sha());
         }
 
@@ -248,9 +329,19 @@ impl<'a> Copier<'a> {
         if dest_parent_commit_shas.len() == 2 {
             let first = dest_parent_commit_shas[0];
             let second = dest_parent_commit_shas[1];
-            if self.dest.working.graph_descendant_of(first, second).unwrap() {
+            if self
+                .dest
+                .working
+                .graph_descendant_of(first, second)
+                .unwrap()
+            {
                 dest_parent_commit_shas = vec![first];
-            } else if self.dest.working.graph_descendant_of(second, first).unwrap() {
+            } else if self
+                .dest
+                .working
+                .graph_descendant_of(second, first)
+                .unwrap()
+            {
                 dest_parent_commit_shas = vec![second]
             }
         }
@@ -267,18 +358,21 @@ impl<'a> Copier<'a> {
             .unwrap();
         info!("Set head to {}", new_dest_head);
 
-        info!("Copying {} with source parents of {:?}", source_sha, source_parent_shas);
+        info!(
+            "Copying {} with source parents of {:?}",
+            source_sha, source_parent_shas
+        );
         let source_parent_tree = if source_parent_shas.len() > 1 {
             dest_parent_commit_shas
                 .first()
                 .map(|dest_parent_sha| self.get_source_sha(dest_parent_sha))
         } else {
-            source_parent_shas
-                .first()
-                .map(|v| *v)
-        }.map(|sha| self.source.bare.find_commit(sha).unwrap().tree().unwrap());
+            source_parent_shas.first().map(|v| *v)
+        }
+        .map(|sha| self.source.bare.find_commit(sha).unwrap().tree().unwrap());
 
-        let diff = self.source
+        let diff = self
+            .source
             .bare
             .diff_tree_to_tree(
                 source_parent_tree.as_ref(),
@@ -305,7 +399,8 @@ impl<'a> Copier<'a> {
                             .create(true)
                             .open(&applicable_path)
                             .expect(&format!("Could not open {:?}", applicable_path));
-                        let new_blob = self.source
+                        let new_blob = self
+                            .source
                             .bare
                             .find_object(delta.new_file().id(), Some(ObjectType::Blob))
                             .unwrap()
@@ -323,7 +418,8 @@ impl<'a> Copier<'a> {
                             .create(false)
                             .open(&applicable_path)
                             .expect(&format!("Could not open {:?}", applicable_path));
-                        let new_blob = self.source
+                        let new_blob = self
+                            .source
                             .bare
                             .find_object(delta.new_file().id(), Some(ObjectType::Blob))
                             .unwrap()
@@ -378,7 +474,8 @@ impl<'a> Copier<'a> {
                 .collect();
             let parent_commits_refs: Vec<&Commit> = parent_commits.iter().collect();
 
-            new_dest_sha = self.dest
+            new_dest_sha = self
+                .dest
                 .working
                 .commit(
                     Some("HEAD"),

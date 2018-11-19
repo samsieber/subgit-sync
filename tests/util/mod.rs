@@ -1,15 +1,19 @@
 #![allow(unused)]
 
-use std::path::{PathBuf, Path};
-use std::fs::{remove_dir_all, create_dir_all};
-use std::error::Error;
 use std;
+use std::error::Error;
 use std::ffi::OsStr;
+use std::fs::{create_dir_all, remove_dir_all};
+use std::path::{Path, PathBuf};
 use std::process::Output;
-use subgit_rs::{StringError, make_absolute};
+use subgit_rs::{make_absolute, StringError};
 
-pub fn write_files<P, K,V,I>(root: P, files: I) -> Result<(), Box<Error>>
-    where P: AsRef<Path>, K: AsRef<Path>, V: AsRef<[u8]>, I: IntoIterator<Item=(K,V)>
+pub fn write_files<P, K, V, I>(root: P, files: I) -> Result<(), Box<Error>>
+where
+    P: AsRef<Path>,
+    K: AsRef<Path>,
+    V: AsRef<[u8]>,
+    I: IntoIterator<Item = (K, V)>,
 {
     let root_dir = root.as_ref();
 
@@ -38,10 +42,14 @@ pub fn test_dir(path: &str) -> PathBuf {
 
 pub fn init_bare_repo<P: AsRef<Path>>(name: &str, parent: P) -> Result<PathBuf, Box<Error>> {
     command(&parent, "git", ["init", "--bare", name].iter())?;
-    Ok(PathBuf::from(format!("{}/{}", parent.as_ref().to_string_lossy(), name)))
+    Ok(PathBuf::from(format!(
+        "{}/{}",
+        parent.as_ref().to_string_lossy(),
+        name
+    )))
 }
 
-pub fn clone<P: AsRef<Path>, CWD: AsRef<Path>>(cwd: CWD, p: P) -> Res<PathBuf>{
+pub fn clone<P: AsRef<Path>, CWD: AsRef<Path>>(cwd: CWD, p: P) -> Res<PathBuf> {
     let fps = p.as_ref().to_string_lossy();
     let fp = fps.split("/").last().unwrap();
     let name = fp.split(".").nth(0).unwrap();
@@ -50,11 +58,16 @@ pub fn clone<P: AsRef<Path>, CWD: AsRef<Path>>(cwd: CWD, p: P) -> Res<PathBuf>{
     Ok(cwd.as_ref().join(name).to_owned())
 }
 
-pub fn assert_works<F: FnOnce() -> Result<(), Box<Error>>>(f:F) {
+pub fn assert_works<F: FnOnce() -> Result<(), Box<Error>>>(f: F) {
     f().unwrap();
 }
 
-pub fn assert_contents_equal<P1: AsRef<Path>, P2: AsRef<Path>, R1: AsRef<Path>, R2: AsRef<Path>>(root1: R1, sub_path1: P1, root2: R2, sub_path2: P2){
+pub fn assert_contents_equal<P1: AsRef<Path>, P2: AsRef<Path>, R1: AsRef<Path>, R2: AsRef<Path>>(
+    root1: R1,
+    sub_path1: P1,
+    root2: R2,
+    sub_path2: P2,
+) {
     let s1 = std::fs::read_to_string(root1.as_ref().join(&sub_path1)).unwrap();
     let s2 = std::fs::read_to_string(root2.as_ref().join(&sub_path2)).unwrap();
     assert_eq!(s1, s2);
@@ -64,23 +77,43 @@ pub fn assert_dir_content_equal<D1: AsRef<Path>, D2: AsRef<Path>>(origin: D1, co
     let raw = command_raw(
         std::env::current_dir().unwrap(),
         "diff",
-        ["--exclude=.git", &origin.as_ref().to_string_lossy(), &comp.as_ref().to_string_lossy()].iter()
-    ).unwrap();
+        [
+            "--exclude=.git",
+            &origin.as_ref().to_string_lossy(),
+            &comp.as_ref().to_string_lossy(),
+        ]
+        .iter(),
+    )
+    .unwrap();
     assert_eq!("", &String::from_utf8(raw.stdout).unwrap());
 }
 
-pub fn set_credentials<P: AsRef<Path>>(path: P){
-    command(&path.as_ref(), "git", ["config", "user.name", "test user"].iter()).unwrap();
-    command(&path.as_ref(), "git", ["config", "user.email", "test@example.com"].iter()).unwrap();
+pub fn set_credentials<P: AsRef<Path>>(path: P) {
+    command(
+        &path.as_ref(),
+        "git",
+        ["config", "user.name", "test user"].iter(),
+    )
+    .unwrap();
+    command(
+        &path.as_ref(),
+        "git",
+        ["config", "user.email", "test@example.com"].iter(),
+    )
+    .unwrap();
 }
 
 pub fn command<P, C, I, S>(path: P, command: C, args: I) -> Result<(), Box<Error>>
-    where P: AsRef<Path>, C: AsRef<OsStr>, I: IntoIterator<Item=S>, S: AsRef<OsStr>
+where
+    P: AsRef<Path>,
+    C: AsRef<OsStr>,
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
 {
     let result = command_raw(path, command, args)?;
 
     if !result.status.success() {
-        let err_message =format!(
+        let err_message = format!(
             "Could not execute command {}. Full command output: \nStd Out:\n{}\nStd Err:\n{}",
             &result.status,
             String::from_utf8(result.stdout)?,
@@ -89,7 +122,9 @@ pub fn command<P, C, I, S>(path: P, command: C, args: I) -> Result<(), Box<Error
 
         println!("{}", err_message);
 
-        return Err(Box::new(StringError { message: err_message }));
+        return Err(Box::new(StringError {
+            message: err_message,
+        }));
     } else {
         println!("{}", String::from_utf8(result.stdout)?);
         println!("{}", String::from_utf8(result.stderr)?);
@@ -99,7 +134,11 @@ pub fn command<P, C, I, S>(path: P, command: C, args: I) -> Result<(), Box<Error
 }
 
 pub fn command_raw<P, C, I, S>(path: P, command: C, args: I) -> Result<Output, Box<Error>>
-    where P: AsRef<Path>, C: AsRef<OsStr>, I: IntoIterator<Item=S>, S: AsRef<OsStr>
+where
+    P: AsRef<Path>,
+    C: AsRef<OsStr>,
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
 {
     let mut process = std::process::Command::new(&command);
     process

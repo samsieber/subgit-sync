@@ -1,11 +1,11 @@
 use std;
-use std::path::{Path, PathBuf};
 use std::error::Error;
-use std::fs::File;
 use std::fs::symlink_metadata;
+use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::Read;
 use std::io::Write;
+use std::path::{Path, PathBuf};
 
 pub use std::fs::{copy, create_dir, create_dir_all, remove_dir_all};
 
@@ -59,7 +59,8 @@ pub fn symlink_dirs<SP: AsRef<Path>, DP: AsRef<Path>>(
     dirs: &Vec<&str>,
 ) -> Result<(), Box<Error>> {
     let abs_source = make_absolute(&source)?;
-    let links: Result<Vec<()>, _> = dirs.iter()
+    let links: Result<Vec<()>, _> = dirs
+        .iter()
         .map(|&dir| -> Result<(), Box<Error>> {
             Ok(std::os::unix::fs::symlink(
                 abs_source.join(dir),

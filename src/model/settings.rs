@@ -1,13 +1,13 @@
-use serde_json;
-use log::LevelFilter;
-use std::path::{Path, PathBuf};
-use crate::logging;
-use crate::fs;
 use crate::action::RecursionDetection;
-use log_panics;
 use crate::action::RecursionStatus;
+use crate::fs;
+use crate::logging;
+use log::LevelFilter;
+use log_panics;
+use serde_json;
+use std::path::{Path, PathBuf};
 
-pub const SETTINGS_FILE : &str = "settings.json";
+pub const SETTINGS_FILE: &str = "settings.json";
 
 #[derive(Serialize, Deserialize, Debug)]
 struct SettingsFile {
@@ -41,18 +41,25 @@ impl Settings {
                 file_log_level,
                 recursion_detection,
                 filters,
-            }).unwrap(),
+            })
+            .unwrap(),
         );
     }
 
     pub fn should_abort_hook(&self) -> bool {
-        let status : RecursionStatus = self.recursion_detection().detect_recursion();
-        let status_str = if status.is_recursing { "Detected hook recursion" } else { "No hook recursion detected" };
+        let status: RecursionStatus = self.recursion_detection().detect_recursion();
+        let status_str = if status.is_recursing {
+            "Detected hook recursion"
+        } else {
+            "No hook recursion detected"
+        };
         info!("{} - {}", status_str, status.reason);
         status.is_recursing
     }
 
-    pub fn recursion_detection(&self) -> RecursionDetection { self.internal.recursion_detection.clone() }
+    pub fn recursion_detection(&self) -> RecursionDetection {
+        self.internal.recursion_detection.clone()
+    }
 
     pub fn upstream_path(&self) -> String {
         self.internal.upstream_path.clone()

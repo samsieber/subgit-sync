@@ -1,15 +1,15 @@
 #[macro_use]
 extern crate maplit;
 
-extern crate subgit_rs;
 extern crate log;
 extern crate simplelog;
+extern crate subgit_rs;
 
-mod util;
 mod harness;
+mod util;
 
-use crate::util::*;
 use crate::harness::*;
+use crate::util::*;
 
 #[test]
 fn modify_modify_modify() {
@@ -19,7 +19,7 @@ fn modify_modify_modify() {
         hashmap!{ "sub/testing" => "Overwritten in upstream" },
     ];
 
-    run_basic_branch_test( &test_dir("modify_modify_modify"), data).unwrap();
+    run_basic_branch_test(&test_dir("modify_modify_modify"), data).unwrap();
 }
 
 #[test]
@@ -30,5 +30,5 @@ fn add_new_in_subgit_modify_upstream() {
         hashmap!{ "sub/testing" => "Overwritten in upstream", "sub/new.txt" => "Hello again" },
     ];
 
-    run_basic_branch_test( &test_dir("add_new_in_subgit_modify_upstream"), data).unwrap();
+    run_basic_branch_test(&test_dir("add_new_in_subgit_modify_upstream"), data).unwrap();
 }

@@ -1,26 +1,26 @@
+use git2;
 use git2::{Oid, Repository};
-use std::path::{Path, PathBuf};
 use std;
 use std::error::Error;
-use git2;
+use std::path::{Path, PathBuf};
 
 use crate::fs;
 use crate::git;
 use crate::util;
 
-mod map;
 mod copier;
+mod map;
 pub mod settings;
 
-use log::LevelFilter;
-use crate::model::map::CommitMapper;
-use simplelog::WriteLogger;
-use simplelog::Config;
-use std::fs::File;
 use crate::action::lock;
 use crate::action::RecursionDetection;
 use crate::action::RecursionStatus;
 use crate::action::RefFilter;
+use crate::model::map::CommitMapper;
+use log::LevelFilter;
+use simplelog::Config;
+use simplelog::WriteLogger;
+use std::fs::File;
 
 pub struct WrappedSubGit {
     pub location: PathBuf,
@@ -42,7 +42,10 @@ pub struct BinSource {
 }
 
 impl WrappedSubGit {
-    pub fn open<SP: AsRef<Path>, F: FnOnce(&Vec<String>)>(subgit_location: SP, before_load: Option<F>) -> Result<Option<WrappedSubGit>, Box<Error>> {
+    pub fn open<SP: AsRef<Path>, F: FnOnce(&Vec<String>)>(
+        subgit_location: SP,
+        before_load: Option<F>,
+    ) -> Result<Option<WrappedSubGit>, Box<Error>> {
         let subgit_top_path: &Path = subgit_location.as_ref();
         let subgit_data_path = subgit_top_path.join("data");
         info!("Loading settings");
@@ -76,8 +79,12 @@ impl WrappedSubGit {
     }
 
     pub fn should_abort_hook(&self) -> bool {
-        let status : RecursionStatus = self.recursion_detection.detect_recursion();
-        let status_str = if status.is_recursing { "Detected hook recursion" } else { "No hook recursion detected" };
+        let status: RecursionStatus = self.recursion_detection.detect_recursion();
+        let status_str = if status.is_recursing {
+            "Detected hook recursion"
+        } else {
+            "No hook recursion detected"
+        };
         info!("{} - {}", status_str, status.reason);
         status.is_recursing
     }
@@ -118,11 +125,17 @@ impl WrappedSubGit {
             return Ok(());
         }
 
-        info!("Updating ref: {} from {:?} -> {:?}", ref_name.as_ref(), old, new);
+        info!(
+            "Updating ref: {} from {:?} -> {:?}",
+            ref_name.as_ref(),
+            old,
+            new
+        );
         let mapper = map::CommitMapper { map: &self.map };
 
         let old_upstream = mapper.get_translated(old, "local", "upstream");
-        let real_upstream = self.upstream_bare
+        let real_upstream = self
+            .upstream_bare
             .find_reference(ref_name.as_ref())
             .map(|reference| {
                 Some(
@@ -137,11 +150,8 @@ impl WrappedSubGit {
 
         if old_upstream != real_upstream && real_upstream != None {
             info!("Importing new upstream commits first. Expected old upstream was {:?}, but real one is {:?}", old_upstream, real_upstream);
-            let new_old_local_sha = self.import_upstream_commits(
-                ref_name.as_ref(),
-                old_upstream,
-                real_upstream,
-            );
+            let new_old_local_sha =
+                self.import_upstream_commits(ref_name.as_ref(), old_upstream, real_upstream);
             if old != new_old_local_sha {
                 return Err(Box::new(util::StringError {
                     message: "Out of sync with the upstream repo!".to_owned(),
@@ -158,7 +168,6 @@ impl WrappedSubGit {
         Ok(())
     }
 
-
     fn export_local_commits(
         &self,
         ref_name: &str,
@@ -167,7 +176,14 @@ impl WrappedSubGit {
     ) -> Option<Oid> {
         let sha_copier = self.get_exporter();
 
-        sha_copier.copy_ref_unchecked(ref_name, old_local_sha, new_local_sha, false, self.recursion_detection.get_push_opts(), None::<&RecursionDetection>)
+        sha_copier.copy_ref_unchecked(
+            ref_name,
+            old_local_sha,
+            new_local_sha,
+            false,
+            self.recursion_detection.get_push_opts(),
+            None::<&RecursionDetection>,
+        )
     }
 
     pub fn import_upstream_commits(
@@ -178,10 +194,17 @@ impl WrappedSubGit {
     ) -> Option<Oid> {
         let sha_copier = self.get_importer();
 
-        sha_copier.copy_ref_unchecked(ref_name, old_upstream_sha, new_upstream_sha, true, self.recursion_detection.get_push_opts(), Some(&self.recursion_detection))
+        sha_copier.copy_ref_unchecked(
+            ref_name,
+            old_upstream_sha,
+            new_upstream_sha,
+            true,
+            self.recursion_detection.get_push_opts(),
+            Some(&self.recursion_detection),
+        )
     }
 
-    fn get_importer<'a>(&'a self) -> copier::Copier<'a>{
+    fn get_importer<'a>(&'a self) -> copier::Copier<'a> {
         let mapper = map::CommitMapper { map: &self.map };
         copier::Copier {
             source: copier::GitLocation {
@@ -200,7 +223,7 @@ impl WrappedSubGit {
         }
     }
 
-    fn get_exporter<'a>(&'a self) -> copier::Copier<'a>{
+    fn get_exporter<'a>(&'a self) -> copier::Copier<'a> {
         let mapper = map::CommitMapper { map: &self.map };
         copier::Copier {
             dest: copier::GitLocation {
@@ -273,7 +296,8 @@ impl WrappedSubGit {
             LevelFilter::Debug,
             Config::default(),
             File::create(log_file).unwrap(),
-        ).expect("Could not setup logging");
+        )
+        .expect("Could not setup logging");
 
         let subgit_path: &Path = subgit_location.as_ref();
         let upstream_path: &Path = upstream_location.as_ref();
@@ -293,17 +317,12 @@ impl WrappedSubGit {
         info!("Creating upstream access (symlinking)");
         let upstream_path_abs = fs::make_absolute(upstream_path)?;
         std::os::unix::fs::symlink(&upstream_path_abs, subgit_data_path.join("upstream.git"))?;
-//        let upstream_bare = Repository::open_bare(subgit_data_path.join("upstream.git"))?;
+        //        let upstream_bare = Repository::open_bare(subgit_data_path.join("upstream.git"))?;
 
         info!("Creating upstream working directory (for moving changes from subdir -> upstream)");
-        let upstream_url_to_clone = upstream_working_clone_url.unwrap_or_else(|| {
-            upstream_path_abs.to_string_lossy().to_string()
-        });
-        git::clone_remote(
-            &upstream_url_to_clone,
-            &subgit_data_path,
-            "upstream",
-        );
+        let upstream_url_to_clone = upstream_working_clone_url
+            .unwrap_or_else(|| upstream_path_abs.to_string_lossy().to_string());
+        git::clone_remote(&upstream_url_to_clone, &subgit_data_path, "upstream");
         let upstream_working = Repository::open(subgit_data_path.join("upstream")).unwrap();
         git::disable_gc(&upstream_working);
         git::set_push_simple(&upstream_working);
@@ -331,17 +350,10 @@ impl WrappedSubGit {
         fs::create_dir(mirror_raw_path.join("hooks"))?;
 
         info!("Create mirror working directory (for moving changes from upstream -> subdir)");
-        let subgit_url_to_clone = subgit_working_clone_url.unwrap_or_else(|| {
-            mirror_raw_path.to_string_lossy().to_string()
-        });
-        git::clone_remote(
-            &subgit_url_to_clone,
-            &subgit_data_path,
-            "local"
-        );
-        let mirror_working =  Repository::open(
-            subgit_data_path.join("local"),
-        )?;
+        let subgit_url_to_clone = subgit_working_clone_url
+            .unwrap_or_else(|| mirror_raw_path.to_string_lossy().to_string());
+        git::clone_remote(&subgit_url_to_clone, &subgit_data_path, "local");
+        let mirror_working = Repository::open(subgit_data_path.join("local"))?;
         git::disable_gc(&mirror_working);
         git::set_push_simple(&mirror_working);
 
@@ -362,10 +374,10 @@ impl WrappedSubGit {
             )?;
             mirror_working.set_head("refs/sync/empty")?;
             git::push_sha_ext(&mirror_working, "refs/sync/empty", false, None)?;
-//
-//            if let Ok(reference) = upstream_bare.find_reference("refs/sync/empty") {
-//                git::delete_remote_branch(upstream_working, "refs/sync/empty", None)?;
-//            }
+            //
+            //            if let Ok(reference) = upstream_bare.find_reference("refs/sync/empty") {
+            //                git::delete_remote_branch(upstream_working, "refs/sync/empty", None)?;
+            //            }
 
             let upstream_empty_sha = git::commit_empty(
                 &upstream_working,
@@ -379,9 +391,9 @@ impl WrappedSubGit {
             git::push_sha_ext(&upstream_working, "refs/sync/empty", false, None)?;
             info!("Created {} as the empty upstream ref", &upstream_empty_sha);
 
-            let mapper = CommitMapper { map: &map};
+            let mapper = CommitMapper { map: &map };
 
-            mapper.set_translated(&upstream_empty_sha,"upstream", "local", &subgit_empty_sha);
+            mapper.set_translated(&upstream_empty_sha, "upstream", "local", &subgit_empty_sha);
             mapper.set_translated(&subgit_empty_sha, "local", "upstream", &upstream_empty_sha);
         }
 
@@ -396,25 +408,42 @@ impl WrappedSubGit {
         );
 
         info!("Generating whitelist directory");
-        fs::create_dir_all(&subgit_data_path.join("whitelist")).expect("Could not create whitelist folder");
+        fs::create_dir_all(&subgit_data_path.join("whitelist"))
+            .expect("Could not create whitelist folder");
 
         info!("Generating lock file");
-        { File::create(&subgit_data_path.join("lock"))?; }
+        {
+            File::create(&subgit_data_path.join("lock"))?;
+        }
         info!("Preparing to lock");
         let lock = lock(&subgit_location)?;
 
         info!("Copying hook file");
         let hook_path = subgit_location.as_ref().join("data").join("hook");
         match bin_loc {
-            BinSource {location, symlink: true } => std::os::unix::fs::symlink(fs::make_absolute(location)?, &hook_path)?,
-            BinSource {location, symlink: false } => { std::fs::copy(location, &hook_path)?; },
+            BinSource {
+                location,
+                symlink: true,
+            } => std::os::unix::fs::symlink(fs::make_absolute(location)?, &hook_path)?,
+            BinSource {
+                location,
+                symlink: false,
+            } => {
+                std::fs::copy(location, &hook_path)?;
+            }
         };
 
         info!("Adding subgit hook");
-        std::os::unix::fs::symlink(fs::make_absolute(&hook_path)?, subgit_location.as_ref().join(subgit_hook_path))?;
+        std::os::unix::fs::symlink(
+            fs::make_absolute(&hook_path)?,
+            subgit_location.as_ref().join(subgit_hook_path),
+        )?;
 
         info!("Adding upstream hook");
-        std::os::unix::fs::symlink(fs::make_absolute(&hook_path)?, upstream_location.as_ref().join(upstream_hook_path))?;
+        std::os::unix::fs::symlink(
+            fs::make_absolute(&hook_path)?,
+            upstream_location.as_ref().join(upstream_hook_path),
+        )?;
 
         Ok(WrappedSubGit {
             location: subgit_location.as_ref().to_owned(),

@@ -1,20 +1,20 @@
-use std::env;
-use std::path::PathBuf;
-use std::error::Error;
-use std::fs::{canonicalize, read_link};
-use std::ffi::OsString;
-use std;
-use std::io::Read;
-use log::LevelFilter;
-use structopt::StructOpt;
-use crate::action::{Action, SubGitEnv};
-use git2::Oid;
 use crate::action;
-use crate::util::StringError;
 use crate::action::EnvDetect;
-use crate::model::settings::SETTINGS_FILE;
-use structopt::clap::AppSettings;
+use crate::action::{Action, SubGitEnv};
 use crate::make_absolute;
+use crate::model::settings::SETTINGS_FILE;
+use crate::util::StringError;
+use git2::Oid;
+use log::LevelFilter;
+use std;
+use std::env;
+use std::error::Error;
+use std::ffi::OsString;
+use std::fs::{canonicalize, read_link};
+use std::io::Read;
+use std::path::PathBuf;
+use structopt::clap::AppSettings;
+use structopt::StructOpt;
 
 pub enum ExecEnv {
     Subgit(SubGitEnv),
@@ -30,7 +30,6 @@ fn find_subgit_from_hook() -> Result<PathBuf, Box<Error>> {
         Ok(path)
     }
 }
-
 
 fn parse_env_base_recursion_detection(input: &&str) -> EnvDetect {
     let mut iter = input.splitn(2, ":");
@@ -56,7 +55,8 @@ mod tests {
             super::EnvDetect {
                 name: "GL_USERNAME".to_string(),
                 value: "git".to_string(),
-            });
+            }
+        );
     }
 }
 
@@ -72,7 +72,7 @@ mod tests {
 /// to the upstream repo, refusing the push if the upstream cannot be updated. The upstream
 /// hook asynchronously requests the subgit to import the newly pushed commits
 #[derive(StructOpt)]
-#[structopt(raw(global_settings="&[AppSettings::DeriveDisplayOrder]"))]
+#[structopt(raw(global_settings = "&[AppSettings::DeriveDisplayOrder]"))]
 struct SetupRequest {
     /// The location of the bare upstream repository on disk
     upstream_git_location: String,
@@ -95,10 +95,20 @@ struct SetupRequest {
     log_file: Option<PathBuf>,
 
     /// The hook path to use in the upstream repository
-    #[structopt(short = "H", long = "upstream_hook_path", default_value = "hooks/post-receive", parse(from_os_str))]
+    #[structopt(
+        short = "H",
+        long = "upstream_hook_path",
+        default_value = "hooks/post-receive",
+        parse(from_os_str)
+    )]
     upstream_hook_path: PathBuf,
     /// The hook path to use in the subgit repository
-    #[structopt(short = "h", long = "subgit_hook_path", default_value = "hooks/update", parse(from_os_str))]
+    #[structopt(
+        short = "h",
+        long = "subgit_hook_path",
+        default_value = "hooks/update",
+        parse(from_os_str)
+    )]
     subgit_hook_path: PathBuf,
 
     /// Specify an external url to push changes to, when exporting commits to the upstream from the subgit
@@ -115,13 +125,22 @@ struct SetupRequest {
     /// Defaults to using the --push-option added in git 2.10
     /// The value must be in the form of ENV_NAME:ENV_VALUE
     /// For example, for gitlab servers, you'd most likely use 'GL_USERNAME:git' as the value
-    #[structopt(short = "r", long = "env_based_recursion_detection", conflicts_with = "use_whitelist_recursion_detection", parse(from_str = "parse_env_base_recursion_detection"))]
+    #[structopt(
+        short = "r",
+        long = "env_based_recursion_detection",
+        conflicts_with = "use_whitelist_recursion_detection",
+        parse(from_str = "parse_env_base_recursion_detection")
+    )]
     env_based_recursion_detection: Option<EnvDetect>,
 
     /// Disables recursive hook call checking
     /// This cannot be used with a custom subgit_working_clone_url due to the infinite recursion that occurs
     /// when both the upstream hook and subgit hook are triggered during synchronization
-    #[structopt(short = "w", long = "use_whitelist_recursion_detection", conflicts_with = "env_based_recursion_detection")]
+    #[structopt(
+        short = "w",
+        long = "use_whitelist_recursion_detection",
+        conflicts_with = "env_based_recursion_detection"
+    )]
     disable_recursion_detection: bool,
 
     /// Only operate on the refs that start with these values - pass in a comma separated list
@@ -132,8 +151,13 @@ struct SetupRequest {
 impl SetupRequest {
     fn convert(self, copy_from: PathBuf) -> Result<Action, Box<Error>> {
         let recursion_detection = if self.disable_recursion_detection {
-            action::RecursionDetection::UpdateWhitelist(action::UpdateWhitelist{
-                path: make_absolute(PathBuf::from(&self.subgit_git_location).join("data").join("whitelist")).unwrap()
+            action::RecursionDetection::UpdateWhitelist(action::UpdateWhitelist {
+                path: make_absolute(
+                    PathBuf::from(&self.subgit_git_location)
+                        .join("data")
+                        .join("whitelist"),
+                )
+                .unwrap(),
             })
         } else {
             match self.env_based_recursion_detection {
@@ -151,7 +175,9 @@ impl SetupRequest {
             subgit_map_path: self.subgit_map_path.map(|v| PathBuf::from(v)),
 
             log_level: self.log_level.unwrap_or(LevelFilter::Debug),
-            log_file: self.log_file.unwrap_or(PathBuf::from("git_subgit_setup.log")),
+            log_file: self
+                .log_file
+                .unwrap_or(PathBuf::from("git_subgit_setup.log")),
 
             subgit_hook_path: self.subgit_hook_path,
             subgit_working_clone_url: self.subgit_working_clone_url,
@@ -166,7 +192,7 @@ impl SetupRequest {
 }
 
 #[allow(unused)]
-fn read_to_string<R : Read>(readable: &mut R) -> String {
+fn read_to_string<R: Read>(readable: &mut R) -> String {
     let mut s = String::new();
     readable.read_to_string(&mut s).unwrap();
     s
@@ -179,9 +205,7 @@ impl ExecEnv {
 
         let in_hook = git_os_dir.is_some() || gl_username.is_some();
 
-
-
-//        println!("Current Path: {:?}, Current Git DIR: {:?}", env::current_exe().unwrap(), git_os_dir);
+        //        println!("Current Path: {:?}, Current Git DIR: {:?}", env::current_exe().unwrap(), git_os_dir);
 
         if in_hook {
             let cwd = if let Some(git_os_path) = git_os_dir {
@@ -198,11 +222,7 @@ impl ExecEnv {
             } else {
                 let hook_path = find_subgit_from_hook().expect("Cannot follow symlink");
                 let repo_path = hook_path.parent().unwrap().parent().unwrap();
-                if !repo_path
-                    .join("data")
-                    .join(SETTINGS_FILE)
-                    .is_file()
-                {
+                if !repo_path.join("data").join(SETTINGS_FILE).is_file() {
                     panic!("Cannot find subgit path!");
                 };
                 ExecEnv::Upstream(SubGitEnv {
@@ -222,25 +242,26 @@ impl ExecEnv {
     {
         match self {
             ExecEnv::Upstream(env) => {
-
                 let mut s = String::new();
                 std::io::stdin().read_to_string(&mut s).unwrap();
 
-                let reqs = s.lines().map(|v| v.trim()).map(|line| -> Result<action::RefSyncRequest, Box<Error>> {
-                    let entries = line.split(" ").collect::<Vec<&str>>();
-                    match entries[..] {
-                        [old_sha, new_sha, ref_name] => {
-                            Ok(action::RefSyncRequest {
+                let reqs = s
+                    .lines()
+                    .map(|v| v.trim())
+                    .map(|line| -> Result<action::RefSyncRequest, Box<Error>> {
+                        let entries = line.split(" ").collect::<Vec<&str>>();
+                        match entries[..] {
+                            [old_sha, new_sha, ref_name] => Ok(action::RefSyncRequest {
                                 ref_name: ref_name.to_string(),
                                 old_upstream_sha: Oid::from_str(old_sha)?,
                                 new_upstream_sha: Oid::from_str(new_sha)?,
-                            })
-                        },
-                        _ => Err(Box::new(StringError {
-                            message: "Bad args".to_owned()
-                        })),
-                    }
-                }).collect::<Result<Vec<action::RefSyncRequest>, Box<Error>>>()?;
+                            }),
+                            _ => Err(Box::new(StringError {
+                                message: "Bad args".to_owned(),
+                            })),
+                        }
+                    })
+                    .collect::<Result<Vec<action::RefSyncRequest>, Box<Error>>>()?;
 
                 Ok(Action::SyncRefs(action::SyncRefs {
                     env,
@@ -249,7 +270,8 @@ impl ExecEnv {
             }
             ExecEnv::Subgit(env) => {
                 let args: Vec<_> = iterable.into_iter().collect();
-                let string_args: Vec<String> = args.iter()
+                let string_args: Vec<String> = args
+                    .iter()
                     .map(|v| v.clone().into().to_string_lossy().into_owned())
                     .collect();
                 string_args.iter().for_each(|v| debug!("Arg: {}", v));

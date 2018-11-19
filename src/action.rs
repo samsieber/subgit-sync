@@ -1,14 +1,14 @@
-use std::path::PathBuf;
-use log::LevelFilter;
-use std::error::Error;
-use std::fs::File;
+use crate::git;
 use fs2::FileExt;
 use git2::Oid;
-use std::env;
-use crate::git;
-use std::path::Path;
-use std::fs;
 use hex;
+use log::LevelFilter;
+use std::env;
+use std::error::Error;
+use std::fs;
+use std::fs::File;
+use std::path::Path;
+use std::path::PathBuf;
 
 pub type RunResult = Result<(), Box<Error>>;
 
@@ -22,7 +22,7 @@ impl RefFilter for Vec<String> {
     }
 }
 
-impl <'a> RefFilter for &'a Vec<String> {
+impl<'a> RefFilter for &'a Vec<String> {
     fn matches<R: AsRef<str>>(&self, ref_name: R) -> bool {
         self.iter().any(|v| ref_name.as_ref().starts_with(v))
     }
@@ -81,12 +81,16 @@ pub trait PushListener {
     fn post_push<S: AsRef<str>>(&self, ref_name: S, sha: Oid);
 }
 
-fn convert_ref_name<S: AsRef<str>>(name: S) -> String{
-    name.as_ref().replace("/",":")
+fn convert_ref_name<S: AsRef<str>>(name: S) -> String {
+    name.as_ref().replace("/", ":")
 }
 
-fn get_file_name<N: AsRef<str>>(ref_name: N, sha: Oid) -> String{
-    format!("{}-{}", convert_ref_name(ref_name), hex::encode(sha.as_bytes()))
+fn get_file_name<N: AsRef<str>>(ref_name: N, sha: Oid) -> String {
+    format!(
+        "{}-{}",
+        convert_ref_name(ref_name),
+        hex::encode(sha.as_bytes())
+    )
 }
 
 impl UpdateWhitelist {
@@ -95,14 +99,17 @@ impl UpdateWhitelist {
     }
 }
 
-impl <'a> PushListener for &'a RecursionDetection {
+impl<'a> PushListener for &'a RecursionDetection {
     fn pre_push<S: AsRef<str>>(&self, ref_name: S, sha: Oid) {
         match self {
             RecursionDetection::UpdateWhitelist(update_whitelist) => {
                 let handle = update_whitelist.get_handle(ref_name, sha);
-                info!("Creating whitelist file for recursion detection: {}", &handle.to_string_lossy());
+                info!(
+                    "Creating whitelist file for recursion detection: {}",
+                    &handle.to_string_lossy()
+                );
                 File::create(handle).unwrap();
-            },
+            }
             _ => {}
         }
     }
@@ -112,17 +119,17 @@ impl <'a> PushListener for &'a RecursionDetection {
             RecursionDetection::UpdateWhitelist(update_whitelist) => {
                 let handle = update_whitelist.get_handle(ref_name, sha);
                 fs::remove_file(handle).unwrap();
-            },
+            }
             _ => {}
         }
     }
 }
 
 impl RecursionDetection {
-    pub fn get_push_opts(&self) -> Option<Vec<String>>{
+    pub fn get_push_opts(&self) -> Option<Vec<String>> {
         info!("Using push opts from {:?}", &self);
         match self {
-            &RecursionDetection::UsePushOptions => Some(vec!("IGNORE_SUBGIT_UPDATE".to_string())),
+            &RecursionDetection::UsePushOptions => Some(vec!["IGNORE_SUBGIT_UPDATE".to_string()]),
             &RecursionDetection::EnvBased(ref _env_detect) => None,
             &RecursionDetection::Disabled => None,
             &RecursionDetection::UpdateWhitelist(ref _update_whitelist) => None,
@@ -135,48 +142,71 @@ impl RecursionDetection {
                 is_recursing: false,
                 reason: "Disabled".to_string(),
             },
-            &RecursionDetection::UsePushOptions =>  if git::get_git_options().unwrap_or(vec!()).iter().any(|x| x == "IGNORE_SUBGIT_UPDATE") {
-                RecursionStatus {
-                    is_recursing: true,
-                    reason: format!("Found 'IGNORE_SUBGIT_UPDATE' as a git push option env variable value")
-                }
-            } else {
-                RecursionStatus {
-                    is_recursing: false,
-                    reason: format!("Didn't find 'IGNORE_SUBGIT_UPDATE' as a git push option env variable value")
-                }
-            },
-            &RecursionDetection::EnvBased(ref env_detect) => if let Ok(value) = env::var(&env_detect.name) {
-                if value == env_detect.value {
+            &RecursionDetection::UsePushOptions => {
+                if git::get_git_options()
+                    .unwrap_or(vec![])
+                    .iter()
+                    .any(|x| x == "IGNORE_SUBGIT_UPDATE")
+                {
                     RecursionStatus {
                         is_recursing: true,
-                        reason: format!("Found variable {} with value {}", env_detect.name, env_detect.value)
+                        reason: format!(
+                            "Found 'IGNORE_SUBGIT_UPDATE' as a git push option env variable value"
+                        ),
                     }
                 } else {
                     RecursionStatus {
-                        is_recursing: false,
-                        reason: format!("Found variable {} with value {} (needed {} as the value)", env_detect.name, value, env_detect.value)
-                    }
-                }
-            } else {
-                RecursionStatus {
                     is_recursing: false,
-                    reason: format!("Didn't find an env variable named {}", env_detect.name)
+                    reason: format!("Didn't find 'IGNORE_SUBGIT_UPDATE' as a git push option env variable value")
                 }
-            },
-            &RecursionDetection::UpdateWhitelist(ref whitelist) => {
-                if let Some(new_sha) = env::args().nth(3) {
-                    let ref_name = env::args().nth(1).unwrap();
-                    let path = whitelist.get_handle(ref_name, Oid::from_str(&new_sha).unwrap_or(git::no_sha()));
-                    if path.exists(){
+                }
+            }
+            &RecursionDetection::EnvBased(ref env_detect) => {
+                if let Ok(value) = env::var(&env_detect.name) {
+                    if value == env_detect.value {
                         RecursionStatus {
                             is_recursing: true,
-                            reason: format!("Found file {} matching update request", path.to_string_lossy())
+                            reason: format!(
+                                "Found variable {} with value {}",
+                                env_detect.name, env_detect.value
+                            ),
                         }
                     } else {
                         RecursionStatus {
                             is_recursing: false,
-                            reason: format!("Could not find file {} matching update request", path.to_string_lossy())
+                            reason: format!(
+                                "Found variable {} with value {} (needed {} as the value)",
+                                env_detect.name, value, env_detect.value
+                            ),
+                        }
+                    }
+                } else {
+                    RecursionStatus {
+                        is_recursing: false,
+                        reason: format!("Didn't find an env variable named {}", env_detect.name),
+                    }
+                }
+            }
+            &RecursionDetection::UpdateWhitelist(ref whitelist) => {
+                if let Some(new_sha) = env::args().nth(3) {
+                    let ref_name = env::args().nth(1).unwrap();
+                    let path = whitelist
+                        .get_handle(ref_name, Oid::from_str(&new_sha).unwrap_or(git::no_sha()));
+                    if path.exists() {
+                        RecursionStatus {
+                            is_recursing: true,
+                            reason: format!(
+                                "Found file {} matching update request",
+                                path.to_string_lossy()
+                            ),
+                        }
+                    } else {
+                        RecursionStatus {
+                            is_recursing: false,
+                            reason: format!(
+                                "Could not find file {} matching update request",
+                                path.to_string_lossy()
+                            ),
                         }
                     }
                 } else {
@@ -217,7 +247,7 @@ pub struct Setup {
     pub recursion_detection: RecursionDetection,
 
     // ref matching
-    pub filters: Vec<String>
+    pub filters: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -236,9 +266,14 @@ pub enum Action {
     UpdateHook(UpdateHook),
 }
 
-pub fn lock<P: AsRef<Path>>(root: P) -> Result<File, Box<Error>>{
-    info!("Trying to lock on {:?}", crate::fs::make_absolute(&root.as_ref().join("data/lock")));
-    let file = fs::OpenOptions::new().read(true).open(root.as_ref().join("data/lock"))?;
+pub fn lock<P: AsRef<Path>>(root: P) -> Result<File, Box<Error>> {
+    info!(
+        "Trying to lock on {:?}",
+        crate::fs::make_absolute(&root.as_ref().join("data/lock"))
+    );
+    let file = fs::OpenOptions::new()
+        .read(true)
+        .open(root.as_ref().join("data/lock"))?;
     file.lock_exclusive()?;
     info!("Locked!");
     Ok(file)
@@ -246,7 +281,8 @@ pub fn lock<P: AsRef<Path>>(root: P) -> Result<File, Box<Error>>{
 
 impl Setup {
     fn run(self) -> RunResult {
-        let subgit_map_path = self.subgit_map_path
+        let subgit_map_path = self
+            .subgit_map_path
             .map(|v| v.to_string_lossy().to_string());
         let wrapped = crate::model::WrappedSubGit::run_creation(
             self.subgit_git_location,
@@ -273,7 +309,7 @@ impl Setup {
     }
 }
 
-fn empty(_filters: &Vec<String>){}
+fn empty(_filters: &Vec<String>) {}
 
 impl UpdateHook {
     pub fn run(self) -> RunResult {
@@ -291,7 +327,6 @@ impl UpdateHook {
         }
     }
 }
-
 
 impl SyncAll {
     pub fn run(self) -> RunResult {
@@ -311,23 +346,27 @@ impl SyncAll {
 
 impl SyncRefs {
     pub fn run(self) -> RunResult {
+        let maybe_wrapped = crate::model::WrappedSubGit::open(
+            &self.env.git_dir,
+            Some(|filters: &Vec<String>| {
+                let ref_names: Vec<_> = (&self.requests)
+                    .iter()
+                    .filter(|req| filters.matches(&req.ref_name))
+                    .map(|req| &req.ref_name)
+                    .collect();
 
-        let maybe_wrapped = crate::model::WrappedSubGit::open(&self.env.git_dir, Some(|filters : &Vec<String>| {
-            let ref_names: Vec<_> = (&self.requests).iter()
-                .filter(|req| filters.matches(&req.ref_name))
-                .map(|req| &req.ref_name)
-                .collect();
+                println!("Syncing refs: {:?}", ref_names);
 
-            println!("Syncing refs: {:?}", ref_names);
-
-            super::util::fork_into_child();
-        }))?;
+                super::util::fork_into_child();
+            }),
+        )?;
 
         if let Some(wrapped) = maybe_wrapped {
             info!("Running Sync Refs");
 
             wrapped.update_self();
-            self.requests.into_iter()
+            self.requests
+                .into_iter()
                 .filter(|req| wrapped.filters.matches(&req.ref_name))
                 .for_each(|request| {
                     wrapped.import_upstream_commits(
@@ -346,7 +385,7 @@ impl SyncRefs {
 
 impl Action {
     pub fn run(self) -> RunResult {
-//        println!("Running action: {:?}", &self);
+        //        println!("Running action: {:?}", &self);
         match self {
             Action::Setup(setup) => setup.run(),
             Action::UpdateHook(update) => update.run(),
