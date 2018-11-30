@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 pub struct GitLocation<'a> {
     pub location: &'a Path,
-    pub name: &'static str,
+    pub name: super::Location,
     pub bare: &'a Repository,
     pub working: &'a Repository,
 }
@@ -126,9 +126,9 @@ impl<'a> Copier<'a> {
             source_sha, dest_sha, self.source.name, self.dest.name
         );
         self.mapper
-            .set_translated(source_sha, self.source.name, self.dest.name, &dest_sha);
+            .set_translated(source_sha, self.source.name, &dest_sha);
         self.mapper
-            .set_translated(&dest_sha, self.dest.name, self.source.name, source_sha);
+            .set_translated(&dest_sha, self.dest.name, source_sha);
         dest_sha
     }
 
@@ -143,13 +143,13 @@ impl<'a> Copier<'a> {
 
     fn get_dest_sha(&'a self, source_sha: &Oid) -> Oid {
         self.mapper
-            .get_translated(Some(*source_sha), self.source.name, self.dest.name)
+            .get_translated(Some(source_sha), self.source.name)
             .unwrap()
     }
 
     fn get_source_sha(&'a self, dest_sha: &Oid) -> Oid {
         self.mapper
-            .get_translated(Some(*dest_sha), self.dest.name, self.source.name)
+            .get_translated(Some(dest_sha), self.dest.name)
             .unwrap()
     }
 
@@ -165,14 +165,12 @@ impl<'a> Copier<'a> {
                 self.mapper.set_translated(
                     empty_source_sha,
                     self.source.name,
-                    self.dest.name,
                     &empty_dest_sha,
                 );
             });
             self.mapper.set_translated(
                 &empty_dest_sha,
                 self.dest.name,
-                self.source.name,
                 first_oid,
             );
         }
@@ -206,7 +204,7 @@ impl<'a> Copier<'a> {
         let old_source_sha = supposed_old_source_sha.and_then(|source_sha| {
             if self
                 .mapper
-                .get_translated(Some(source_sha), self.dest.name, self.source.name)
+                .get_translated(Some(&source_sha), self.dest.name)
                 .is_some()
             {
                 Some(source_sha)
@@ -218,9 +216,8 @@ impl<'a> Copier<'a> {
                     .and_then(|reference| {
                         let old_dest_sha = reference.peel_to_commit().unwrap().id();
                         self.mapper.get_translated(
-                            Some(old_dest_sha),
+                            Some(&old_dest_sha),
                             self.dest.name,
-                            self.source.name,
                         )
                     })
             }
@@ -245,7 +242,7 @@ impl<'a> Copier<'a> {
             .into_iter()
             .filter(|&oid| {
                 current_commit += 1;
-                if !self.mapper.has_sha(&oid, self.source.name, self.dest.name) {
+                if !self.mapper.has_sha(&oid, self.source.name) {
                     debug!("Copying Commit ({}/{})", &current_commit, &total_commits);
                     true
                 } else {

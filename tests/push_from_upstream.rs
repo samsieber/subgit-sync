@@ -127,8 +127,8 @@ pub fn push_new_tip_with_existing_sha() {
 }
 
 #[test]
-pub fn push_new_tips_with_existing_sha() {
-    let test = base("push_new_tips_with_existing_sha");
+pub fn push_new_tips_with_existing_sha_u() {
+    let test = base("push_new_tips_with_existing_sha_u");
 
     test.do_then_verify(|upstream, downstream| {
         upstream.checkout_adv(["-b", "second"]).unwrap();

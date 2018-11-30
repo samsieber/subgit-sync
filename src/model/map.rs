@@ -1,87 +1,71 @@
-use crate::fs;
-use git2::{Oid, Repository};
+use git2::Oid;
 use hex;
-use std::path::Path;
-use std::str;
+use rusqlite::Connection;
+use chrono::Utc;
 
 pub struct CommitMapper<'a> {
-    pub map: &'a Repository,
-}
-
-fn sha_path(sha: &Oid) -> String {
-    let depth = 4;
-    let sha_length = 40;
-    let mut sha_path = String::with_capacity(sha_length + depth);
-
-    hex::encode(sha.as_bytes())
-        .as_str()
-        .bytes()
-        .enumerate()
-        .for_each(|(idx, u)| {
-            sha_path.push(u as char);
-            if idx < depth {
-                sha_path.push('/');
-            }
-        });
-
-    sha_path
+    pub conn: &'a Connection,
 }
 
 impl<'a> CommitMapper<'a> {
-    fn workdir(&self) -> &Path {
-        &self
-            .map
-            .workdir()
-            .expect("The map repo must have a workdir")
-    }
-
-    pub fn get_translated<SN: AsRef<str>, DN: AsRef<str>>(
-        &'a self,
-        maybe_sha: Option<Oid>,
-        source: SN,
-        dest: DN,
+    pub fn get_translated(
+        &self,
+        maybe_sha: Option<&Oid>,
+        source: super::Location,
     ) -> Option<Oid> {
         let sha = match maybe_sha {
-            Some(ref sha_) => sha_,
+            Some(sha_) => sha_,
             None => return None,
         };
-        let partial_path = sha_path(sha);
-        let full_path = format!("{}_to_{}/{}", source.as_ref(), dest.as_ref(), partial_path);
-        let content = fs::content_of_file_if_exists(
-            &fs::make_absolute(&self.workdir()).unwrap().join(full_path),
-        );
-        content.map(|oid_str| {
-            Oid::from_bytes(&hex::decode(oid_str).unwrap())
-                .expect("The format should be correct for a stored sha")
-        })
+//        let partial_path = sha_path(sha);
+//        let full_path = format!("{}_to_{}/{}", source.as_ref(), dest.as_ref(), partial_path);
+//        let content = fs::content_of_file_if_exists(
+//            &fs::make_absolute(&self.workdir()).unwrap().join(full_path),
+//        );
+//        content.map(|oid_str| {
+//            Oid::from_bytes(&hex::decode(oid_str).unwrap())
+//                .expect("The format should be correct for a stored sha")
+//        })
+
+        let mut stmt = self.conn.prepare(&format!(r#"
+            SELECT dest
+            FROM {}
+            WHERE :source = source
+            ORDER BY timestamp DESC
+        "#, source.as_source_table())).unwrap();
+        let mut rows = stmt.query_named(&[
+            (":source", &format!("{}", sha)),
+        ]).unwrap();
+        if let Some(row) = rows.next() {
+            let row = row.unwrap();
+            let value: String = row.get(0);
+            Some(Oid::from_bytes(&hex::decode(value.as_bytes()).unwrap())
+                .expect("The format should be correct for a stored sha"))
+        } else {
+            None
+        }
     }
 
-    pub fn has_sha<SN: AsRef<str>, DN: AsRef<str>>(
-        &'a self,
+    pub fn has_sha(
+        &self,
         sha: &Oid,
-        source: SN,
-        dest: DN,
+        source: super::Location,
     ) -> bool {
-        let partial_path = sha_path(sha);
-        let full_path = format!("{}_to_{}/{}", source.as_ref(), dest.as_ref(), partial_path);
-        fs::make_absolute(&self.workdir())
-            .unwrap()
-            .join(full_path)
-            .exists()
+        self.get_translated(Some(sha), source).is_some()
     }
 
-    pub fn set_translated<SN: AsRef<str>, DN: AsRef<str>>(
-        &'a self,
+    pub fn set_translated(
+        &self,
         sha: &Oid,
-        source: SN,
-        dest: DN,
+        source: super::Location,
         translated: &Oid,
     ) {
-        let partial_path = sha_path(sha);
-        let full_path = format!("{}_to_{}/{}", source.as_ref(), dest.as_ref(), partial_path);
-        fs::write_content_to_file(
-            &fs::make_absolute(&self.workdir()).unwrap().join(full_path),
-            &format!("{}", translated),
-        );
+        self.conn.execute_named(
+            &format!(r#"
+                    INSERT INTO {} (source, dest, timestamp)
+                    VALUES (:source, :dest, :timestamp)
+                "#, source.as_source_table()),
+            &[(":source", &format!("{}", sha)), (":dest", &format!("{}", translated)), (":timestamp", &Utc::now())],
+        ).unwrap();
     }
 }

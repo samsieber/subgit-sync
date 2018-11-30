@@ -66,6 +66,23 @@ pub struct ExtGit {
     git_version: Version,
 }
 
+impl ExtGit {
+    pub fn path(&self) -> PathBuf {
+        self.path.clone()
+    }
+
+    pub fn commit_changes(&self, changes: Vec<FileAction>, message: &str) {
+        self.update_working(changes);
+        self.add(".").unwrap();
+        self.commit(message).unwrap();
+    }
+
+    pub fn commit_and_push_changes(&self, changes: Vec<FileAction>, message: &str) {
+        self.commit_changes(changes, message);
+        self.push().unwrap();
+    }
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Version {
     major: u32,
@@ -156,10 +173,7 @@ impl TestWrapper {
             &GitType::Subgit => None,
         };
 
-        source.update_working(changes);
-        source.add(".").unwrap();
-        source.commit(message).unwrap();
-        source.push().unwrap();
+        source.commit_and_push_changes(changes, message);
 
         delay.map(|dur| sleep(dur));
 

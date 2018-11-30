@@ -12,10 +12,16 @@ fn base(name: &str) -> TestWrapper {
     TestWrapper::new(
         name,
         |upstream| {
-            upstream.update_working(vec![FileAction::overwrite(
-                "sub/hello.txt",
-                "Hello world (from upstream)",
-            )]);
+            upstream.update_working(vec![
+                FileAction::overwrite(
+                    "sub/hello.txt",
+                    "Hello world (from upstream)",
+                ),
+                FileAction::overwrite(
+                    "root.txt",
+                    "Hello world (from upstream)",
+                )
+            ]);
             upstream.add(".").unwrap();
             upstream.commit("First Commit from Upstream").unwrap();
             upstream.push().unwrap();

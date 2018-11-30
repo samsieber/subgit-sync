@@ -62,6 +62,11 @@ pub fn assert_works<F: FnOnce() -> Result<(), Box<Error>>>(f: F) {
     f().unwrap();
 }
 
+pub fn assert_file_equals<P1: AsRef<Path>, P2: AsRef<Path>, C: AsRef<str>>(root: P1, sub_path: P2, content: C) {
+    let s1 = std::fs::read_to_string(root.as_ref().join(&sub_path)).unwrap();
+    assert_eq!(&s1, content.as_ref());
+}
+
 pub fn assert_contents_equal<P1: AsRef<Path>, P2: AsRef<Path>, R1: AsRef<Path>, R2: AsRef<Path>>(
     root1: R1,
     sub_path1: P1,
