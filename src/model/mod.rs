@@ -93,15 +93,18 @@ impl WrappedSubGit {
         let git_settings = settings::Settings::load(&subgit_data_path);
         info!("Loaded settings");
 
-        git_settings.setup_logging();
-        info!("Setup logging");
-
         if git_settings.should_abort_hook() {
             Ok(None)
         } else {
             if let Some(before_load_callback) = before_load {
                 before_load_callback(&git_settings.filters());
             }
+            let lock = lock(&subgit_top_path).unwrap();
+            info!("Locked");
+            git_settings.setup_logging();
+            info!("Setup logging");
+
+
             info!("Opened Wrapped");
             Ok(Some(WrappedSubGit {
                 location: subgit_top_path.to_owned(),
@@ -114,7 +117,7 @@ impl WrappedSubGit {
                 local_path: git_settings.local_path(),
                 recursion_detection: git_settings.recursion_detection(),
                 filters: git_settings.filters(),
-                lock: lock(&subgit_top_path).unwrap(),
+                lock,
             }))
         }
     }
