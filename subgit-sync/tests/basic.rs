@@ -3,7 +3,7 @@ extern crate maplit;
 
 extern crate log;
 extern crate simplelog;
-extern crate subgit_rs;
+extern crate subgit_sync;
 
 mod harness;
 mod util;
