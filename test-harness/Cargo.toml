@@ -5,3 +5,12 @@ authors = ["Sam Sieber <swsieber@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+simplelog = "0.5.0"
+hex = "0.3.2"
+serde = "1.0"
+maplit = "1.0.1"
+subgit-sync = { path = "../subgit-sync" }
+
+[dependencies.log]
+version = "0.4"
+features = ["serde"]

@@ -6,7 +6,7 @@ use std::ffi::OsStr;
 use std::fs::{create_dir_all, remove_dir_all};
 use std::path::{Path, PathBuf};
 use std::process::Output;
-use subgit_rs::{make_absolute, StringError};
+use subgit_sync::{make_absolute, StringError};
 
 pub fn write_files<P, K, V, I>(root: P, files: I) -> Result<(), Box<Error>>
 where

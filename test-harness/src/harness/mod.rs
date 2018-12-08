@@ -207,7 +207,7 @@ impl TestWrapper {
         let local_bare = init_bare_repo("subgit.git", &d)?;
 
         // Run the setup...
-        let mut process = std::process::Command::new("target/debug/subgit-rs");
+        let mut process = std::process::Command::new("../target/debug/subgit-sync");
         process
             .env_clear()
             .env("PATH", std::env::var("PATH").unwrap());
@@ -423,7 +423,7 @@ where
     let local_bare = init_bare_repo("local.git", &d)?;
 
     // Run the setup...
-    let mut process = std::process::Command::new("target/debug/subgit-rs");
+    let mut process = std::process::Command::new("../target/debug/subgit-sync");
     process
         .env_clear()
         .env("PATH", std::env::var("PATH").unwrap());

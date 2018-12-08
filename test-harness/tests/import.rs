@@ -2,10 +2,7 @@ extern crate log;
 extern crate simplelog;
 extern crate subgit_sync;
 
-mod harness;
-mod util;
-
-use crate::harness::*;
+use test_harness::harness::*;
 
 #[test]
 pub fn import_single_a_commit() {

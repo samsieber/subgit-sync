@@ -5,11 +5,8 @@ extern crate log;
 extern crate simplelog;
 extern crate subgit_sync;
 
-mod harness;
-mod util;
-
-use crate::harness::*;
-use crate::util::*;
+use test_harness::harness::*;
+use test_harness::util::*;
 
 #[test]
 fn modify_modify_modify() {

@@ -1,7 +1,6 @@
-/data
-*.log
 /target
+
+*.log
 **/*.rs.bk
 .idea/
-foo.txt
 test_data/

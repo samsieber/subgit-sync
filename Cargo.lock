@@ -404,6 +404,14 @@ dependencies = [
 [[package]]
 name = "test-harness"
 version = "0.1.0"
+dependencies = [
+ "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "maplit 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.66 (registry+https://github.com/rust-lang/crates.io-index)",
+ "simplelog 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "subgit-sync 0.2.0",
+]
 
 [[package]]
 name = "textwrap"

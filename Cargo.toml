@@ -1,2 +1,2 @@
 [workspace]
-members = ["subgit-sync", "test-harness"]
+members = ["subgit-sync", "test-harness", "declarative"]
