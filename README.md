@@ -1,4 +1,4 @@
-# SubGit RS [WIP]
+# SubGit RS [WIP - DANGER: Still might eat commits]
 
 Subgit lets you publish a subdirectory in a git repository as it's own synchronized git repository
 without requiring the use of git submodules or git subtrees. It uses a couple of server-side hooks instead.
