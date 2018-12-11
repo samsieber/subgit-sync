@@ -10,6 +10,7 @@ pub use crate::tree::{CommitTree,ChangeSetGenerator};
 pub use crate::executor::DefaultExecutor;
 pub use crate::git::GitConsumer;
 pub use crate::harness::{TestConfig, Test};
+pub use crate::util::sleep;
 
 #[macro_export]
 macro_rules! config_for {

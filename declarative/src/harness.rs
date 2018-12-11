@@ -47,6 +47,7 @@ impl TestConfig {
         let upstream_bare = crate::util::init_bare_repo("upstream.git", &root).expect("Could not init upstream bare repo");
         let upstream_working = crate::util::clone(&root, upstream_bare).unwrap();
         let git = GitWrapper::new(upstream_working.clone());
+        crate::util::set_credentials(&upstream_working, "setup");
         commit_tree.commit_tree(&git, &mut TreeRecord::new());
         git.push_all();
         git.set_head("master".to_owned());
@@ -127,6 +128,7 @@ impl Test {
 
     fn new_consumer(&self, name: String, clone_url: String, filter: Option<String>) -> Consumer {
         crate::util::clone_url(&self.path, clone_url, &name).unwrap();
+        crate::util::set_credentials(self.path.join(&name), &name);
         Consumer::new(self.path.join(&name), filter)
     }
 }

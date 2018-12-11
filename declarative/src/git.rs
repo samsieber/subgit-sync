@@ -204,8 +204,8 @@ pub trait GitConsumer {
     fn push_fail(&self, branch_name: &str) -> &Self;
     fn push_all(&self) -> &Self;
 
-    fn checkout_commit(&self, sha: String) -> &Self;
-    fn checkout_branch(&self, branch: String) -> &Self;
+    fn checkout_commit(&self, sha: &str) -> &Self;
+    fn checkout_branch(&self, branch: &str) -> &Self;
 }
 
 impl <T: GitConsumer> GitConsumer for (String, &T) {
@@ -249,19 +249,25 @@ impl <T: GitConsumer> GitConsumer for (String, &T) {
         self.1.push_all(); self
     }
 
-    fn checkout_commit(&self, sha: String) -> &Self {
+    fn checkout_commit(&self, sha: &str) -> &Self {
         self.1.checkout_commit(sha); self
     }
 
-    fn checkout_branch(&self, branch: String) -> &Self {
+    fn checkout_branch(&self, branch: &str) -> &Self {
         self.1.checkout_commit(branch); self
     }
 }
 
 impl GitConsumer for Consumer {
     fn commit(&self, commit: Commit) -> (String, &Self) {
+        eprintln!("{} - {:?}", &commit.message, &self.filter);
         for (path, action) in commit.changes.files {
-            if (self.filter.is_some() && path.starts_with(self.filter.as_ref().unwrap())) || self.filter.is_none() {
+            if let Some(ref value) = self.filter {
+                let path_string = path.to_string_lossy().to_owned();
+                let path = (&path_string).replace(value, "");
+
+                action.apply(&self.git.path, path);
+            } else {
                 action.apply(&self.git.path, path);
             }
         }
@@ -313,12 +319,12 @@ impl GitConsumer for Consumer {
         self
     }
 
-    fn checkout_commit(&self, sha: String) -> &Self {
+    fn checkout_commit(&self, sha: &str) -> &Self {
         self.git.command(&["checkout", &sha]).unwrap();
         self
     }
 
-    fn checkout_branch(&self, branch: String) -> &Self {
+    fn checkout_branch(&self, branch: &str) -> &Self {
         self.git.command(&["checkout", "-b", &branch]).unwrap();
         self
     }

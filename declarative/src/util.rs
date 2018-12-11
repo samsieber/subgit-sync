@@ -112,17 +112,17 @@ pub fn assert_dir_content_equal<D1: AsRef<Path>, D2: AsRef<Path>>(origin: D1, co
     assert_eq!("", &String::from_utf8(raw.stdout).unwrap());
 }
 
-pub fn set_credentials<P: AsRef<Path>>(path: P) {
+pub fn set_credentials<P: AsRef<Path>>(path: P, name: &str) {
     command(
         &path.as_ref(),
         "git",
-        ["config", "user.name", "test user"].iter(),
+        ["config", "user.name", &format!("User {}", name)].iter(),
     )
         .unwrap();
     command(
         &path.as_ref(),
         "git",
-        ["config", "user.email", "test@example.com"].iter(),
+        ["config", "user.email", &format!("{}@example.com", name)].iter(),
     )
         .unwrap();
 }
