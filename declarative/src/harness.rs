@@ -4,7 +4,8 @@ use crate::executor::Runnable;
 use crate::tree::CommitTree;
 use crate::git::GitWrapper;
 use crate::tree::TreeRecord;
-use crate::git::TestGit;
+use crate::git::InternalGit;
+use crate::git::Consumer;
 
 #[derive(Debug)]
 pub struct TestConfig {
@@ -29,12 +30,6 @@ pub struct Test {
     subgit_url: String,
     /// Path to the folder in the upstream that will be republished
     repub_base: String,
-}
-
-macro_rules! config_for {
-    ($test_name:expr) => {
-        crate::harness::TestConfig::new($test_name, module_path!())
-    }
 }
 
 impl TestConfig {
@@ -121,6 +116,19 @@ impl Test {
             panic!("Differences were found! See above");
         }
     }
+
+    pub fn upstream_consumer<N: AsRef<str>>(&self, name: N) -> Consumer {
+        self.new_consumer(name.as_ref().to_owned(), self.upstream_url.clone(), None)
+    }
+
+    pub fn subgit_consumer<N: AsRef<str>>(&self, name: N) -> Consumer {
+        self.new_consumer(name.as_ref().to_owned(), self.subgit_url.clone(), Some(self.repub_base.clone()))
+    }
+
+    fn new_consumer(&self, name: String, clone_url: String, filter: Option<String>) -> Consumer {
+        crate::util::clone_url(&self.path, clone_url, &name).unwrap();
+        Consumer::new(self.path.join(&name), filter)
+    }
 }
 
 struct Diff {
@@ -138,19 +146,3 @@ struct Compare<'a,'b > {
     comp: PathBuf,
 
 }
-
-
-//pub fn assert_dir_content_equal<D1: AsRef<Path>, D2: AsRef<Path>>(origin: D1, comp: D2) {
-//    let raw = command_raw(
-//        std::env::current_dir().unwrap(),
-//        "diff",
-//        [
-//            "--exclude=.git",
-//            &origin.as_ref().to_string_lossy(),
-//            &comp.as_ref().to_string_lossy(),
-//        ]
-//            .iter(),
-//    )
-//        .unwrap();
-//    assert_eq!("", &String::from_utf8(raw.stdout).unwrap());
-//}

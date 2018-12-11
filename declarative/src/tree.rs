@@ -2,7 +2,9 @@ use std::path::PathBuf;
 use std::collections::HashMap;
 use std::path::Path;
 use std::prelude::v1::Vec;
-
+use crate::git::InternalGit;
+use std::ops::Deref;
+use std::collections::HashSet;
 
 #[derive(Clone, Debug)]
 pub enum FileChange {
@@ -128,11 +130,12 @@ impl ChangesForLabel for MergeCommit {
 pub type FileContent = String;
 pub type BranchName = String;
 
-pub trait NiceGit {
-    fn commit_orphan(&self, message: String, change_set: ChangeSet) -> String;
-    fn commit_merge(&self, message: String, parents: Vec<String>) -> String;
-    fn commit_child(&self, message: String, change_set: ChangeSet, parent: String) -> String;
-    fn make_branch(&self, branch: String, commit: String);
+impl Deref for Commit {
+    type Target = CommitRef;
+
+    fn deref(&self) -> &<Self as Deref>::Target {
+        &self.id
+    }
 }
 
 impl CommitTree {
@@ -143,36 +146,35 @@ impl CommitTree {
         }
     }
 
-    fn add_commit(commits: &mut Vec<Commit>, label: &str, changes: impl ChangesForLabel, parents: Vec<CommitRef>) -> CommitRef {
+    fn add_commit(commits: &mut Vec<Commit>, label: &str, changes: impl ChangesForLabel, parents: Vec<CommitRef>) -> Commit {
         assert_eq!(true, commits.len() as i32 > parents.iter().map(|v| v.0 as i32).max().unwrap_or(-1));
-        let commit_ref = CommitRef(commits.len());
         let commit = Commit {
             message: format!("Commit: {}", &label),
             changes: changes.construct(&label),
             parents: parents,
             id: CommitRef(commits.len()),
         };
-        commits.push(commit);
-        commit_ref
+        commits.push(commit.clone());
+        commit
     }
 
-    pub fn root(&mut self, label: &str, changes: impl ChangesForLabel) -> CommitRef {
+    pub fn root(&mut self, label: &str, changes: impl ChangesForLabel) -> Commit {
         CommitTree::add_commit(&mut self.commits, label, changes, vec!())
     }
 
-    pub fn commit(&mut self, label: &str, changes: impl ChangesForLabel, parent: CommitRef) -> CommitRef {
-        CommitTree::add_commit(&mut self.commits, label, changes, vec!(parent))
+    pub fn commit(&mut self, label: &str, changes: impl ChangesForLabel, parent: &CommitRef) -> Commit {
+        CommitTree::add_commit(&mut self.commits, label, changes, vec!(*parent))
     }
 
-    pub fn merge_2(&mut self, label: &str, parent: CommitRef, other_parent: CommitRef) -> CommitRef {
-        CommitTree::add_commit(&mut self.commits, label, MergeCommit, vec!(parent, other_parent))
+    pub fn merge_2(&mut self, label: &str, parent: &CommitRef, other_parent: &CommitRef) -> Commit {
+        CommitTree::add_commit(&mut self.commits, label, MergeCommit, vec!(*parent, *other_parent))
     }
 
-    pub fn branch(&mut self, name: &str, id: CommitRef){
-        self.branches.insert(name.to_owned(), id);
+    pub fn branch(&mut self, name: &str, id: &CommitRef){
+        self.branches.insert(name.to_owned(), *id);
     }
 
-    pub fn commit_tree<GIT: NiceGit>(self, git: &GIT, record: &mut TreeRecord) {
+    pub fn commit_tree<GIT: InternalGit>(self, git: &GIT, record: &mut TreeRecord) {
         for mut commit in self.commits {
             eprintln!("Working on {}", &commit.message);
             if !record.to_sha.contains_key(&commit.id) {
@@ -195,11 +197,13 @@ impl CommitTree {
         self.branches.iter().map(|(branch, commit_ref)| {
             let branch = branch.clone();
             let ancestor_path = self.ancestor_path(*commit_ref);
+            eprintln!("Commit value for {} - {}", &branch, ancestor_path.len());
             let mut file_map : HashMap<PathBuf, FileContent> = HashMap::new();
 
             ancestor_path.iter()
                 .map(|v| &self.commits[v.0])
                 .for_each(|commit| {
+                    println!("Commit Message: {}", &commit.message);
                     commit.changes.files.iter().for_each(|(path, action)| {
                         match action {
                             FileChange::Deleted => file_map.remove(path),
@@ -208,17 +212,25 @@ impl CommitTree {
                     })
                 });
 
-                (branch, file_map)
+            (branch, file_map)
         }).collect()
     }
 
     fn ancestor_path(&self, commit_ref: CommitRef) -> Vec<CommitRef> {
+        let mut enqueued = HashSet::new();
         let mut queue = vec!(commit_ref);
         let mut i = 0;
+        enqueued.insert(commit_ref);
         while i < queue.len() {
             let item_ref = queue[i];
-            let mut more_items = self.commits[item_ref.0].parents.clone();
-            queue.append(&mut more_items);
+            let more_items = self.commits[item_ref.0].parents.clone();
+            more_items.into_iter()
+                .for_each(|v|
+                    if !enqueued.contains(&v) {
+                        enqueued.insert(v);
+                        queue.push(v);
+                    }
+                );
             i = i + 1;
         }
         queue

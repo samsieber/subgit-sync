@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::Output;
 use subgit_sync::{make_absolute, StringError};
 use std::env;
+use std::time::Duration;
 
 pub fn write_files<P, K, V, I>(root: P, files: I) -> Result<(), Box<Error>>
     where
@@ -191,4 +192,8 @@ fn get_target_dir() -> PathBuf {
 // Get absolute path to the project's top dir, given target dir
 fn get_top_dir<'a>(target_dir: &'a Path) -> &'a Path {
     target_dir.parent().expect("target parent")
+}
+
+pub fn sleep(seconds: u32) {
+    std::thread::sleep(Duration::new(seconds as u64, 0));
 }
