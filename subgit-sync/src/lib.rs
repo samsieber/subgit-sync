@@ -30,6 +30,7 @@ pub use crate::model::BinSource;
 pub use crate::model::WrappedSubGit;
 pub use crate::util::fork_into_child;
 pub use crate::util::StringError;
+pub use crate::cli::SetupRequest;
 
 pub fn run() -> Result<(), Box<Error>> {
     let exec_env = cli::ExecEnv::detect();

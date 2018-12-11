@@ -1,8 +1,18 @@
+mod util;
+
 mod model;
+mod tree;
+
+#[macro_use]
+mod harness;
+
+mod executor;
+mod git;
 
 #[cfg(test)]
 mod tests {
-    use super::model::*;
+    use super::tree::*;
+    use super::executor::*;
 
     #[test]
     fn can_build_tree() {
@@ -18,8 +28,8 @@ mod tests {
             let a4 = tree.merge_2("a4", a2, a3);
             let a5 = tree.commit("a5", target.upstream(), a4);
 
-            tree.branch("master", a1);
-            tree.branch("extra", a4);
+            tree.branch("master", a4);
+            tree.branch("extra", a5);
 
             (tree, a5)
         };
@@ -29,13 +39,26 @@ mod tests {
         let mut expected = initial.clone();
         let a6 = expected.commit("a6", target.both(), a5);
         let a7 = expected.commit("a7", target.both(), a6);
-        let master = expected.branch("master", a7);
 
-        eprintln!("{:#?}", expected)??        // Execute changes
-//        // Setup test executor
-//
-//        let test_setup = register_test(test_name);
-//        let test = test_setup.initial_tree(initial);
+        expected.branch("master", a7);
+
+        eprintln!("{:#?}", expected);        // Execute changes
+        // Setup test executor
+
+        let config = config_for!("My basic test");
+
+        eprintln!("{:#?}", config);
+
+        let test = config.run_setup(initial.clone(), DefaultExecutor {
+            log_file: Some("setup.log".to_owned()),
+            log_level: None,
+            use_daemon: true
+        });
+
+        // Implement consumer actions
+            // Use test git under the hood
+            // Filter file changes by subgit path (if necessary)
+
 //
 //        // Execute actions
 //        let up1 = test.new_upstream_consumer("up1");
@@ -51,7 +74,7 @@ mod tests {
 //            .pull_merge()
 //            .push();
 //
-//        // Run comparison
-//        test.verify_trees(target);
+        // Run comparison
+        test.verify(initial);
     }
 }

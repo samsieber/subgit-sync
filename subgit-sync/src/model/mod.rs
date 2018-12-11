@@ -357,6 +357,7 @@ impl WrappedSubGit {
 
         info!("Creating the mapping repo");
         let map = Connection::open(subgit_data_path.join("map.sqlite"))?;
+        #[allow(non_snake_case)]
         let EMPTY : Vec<String>= vec!();
         map.execute(&Location::UPSTREAM.create_statement(), &EMPTY).unwrap();
         map.execute(&Location::SUBGIT.create_statement(), &EMPTY).unwrap();

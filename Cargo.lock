@@ -80,6 +80,10 @@ dependencies = [
 [[package]]
 name = "declarative"
 version = "0.1.0"
+dependencies = [
+ "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "subgit-sync 0.2.0",
+]
 
 [[package]]
 name = "dtoa"

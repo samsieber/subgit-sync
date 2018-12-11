@@ -1,5 +1,5 @@
 use crate::action;
-use crate::action::EnvDetect;
+pub use crate::action::EnvDetect;
 use crate::action::{Action, SubGitEnv};
 use crate::make_absolute;
 use crate::model::settings::SETTINGS_FILE;
@@ -71,28 +71,28 @@ mod tests {
 /// in the upstream repo. The update hooks synchronously exports commits from the subgit repo
 /// to the upstream repo, refusing the push if the upstream cannot be updated. The upstream
 /// hook asynchronously requests the subgit to import the newly pushed commits
-#[derive(StructOpt)]
+#[derive(Clone, StructOpt)]
 #[structopt(raw(global_settings = "&[AppSettings::DeriveDisplayOrder]"))]
-struct SetupRequest {
+pub struct SetupRequest {
     /// The location of the bare upstream repository on disk
-    upstream_git_location: String,
+    pub upstream_git_location: String,
     /// The location of the bare subgit repository on disk
-    subgit_git_location: String,
+    pub subgit_git_location: String,
 
     /// The path in the upstream repository to republish as the root in the subgit repository
-    upstream_map_path: String,
+    pub upstream_map_path: String,
 
     /// The path in the subgit repo to place the republished files from upstream
     /// Defaults to the root of the repository
     #[structopt(short = "p", long = "subgit_map_path")]
-    subgit_map_path: Option<String>,
+    pub subgit_map_path: Option<String>,
 
     /// The log level to use when logging to file from the hooks
     #[structopt(short = "l", long = "log_level")]
-    log_level: Option<LevelFilter>,
+    pub log_level: Option<LevelFilter>,
     /// The path of the log file to write to during setup
     #[structopt(short = "f", long = "log_file", parse(from_os_str))]
-    log_file: Option<PathBuf>,
+    pub log_file: Option<PathBuf>,
 
     /// The hook path to use in the upstream repository
     #[structopt(
@@ -101,7 +101,7 @@ struct SetupRequest {
         default_value = "hooks/post-receive",
         parse(from_os_str)
     )]
-    upstream_hook_path: PathBuf,
+    pub upstream_hook_path: PathBuf,
     /// The hook path to use in the subgit repository
     #[structopt(
         short = "h",
@@ -109,17 +109,17 @@ struct SetupRequest {
         default_value = "hooks/update",
         parse(from_os_str)
     )]
-    subgit_hook_path: PathBuf,
+    pub subgit_hook_path: PathBuf,
 
     /// Specify an external url to push changes to, when exporting commits to the upstream from the subgit
     /// If not set, uses the file path to the upstream repo
     #[structopt(short = "U", long = "upstream_working_clone_url")]
-    upstream_working_clone_url: Option<String>,
+    pub upstream_working_clone_url: Option<String>,
 
     /// Specify an external url to push changes to, when import commits in the subgit from the upstream
     /// If not set, uses a modified subgit bare repo that bypasses the server hooks
     #[structopt(short = "u", long = "subgit_working_clone_url")]
-    subgit_working_clone_url: Option<String>,
+    pub subgit_working_clone_url: Option<String>,
 
     /// Specifies an environment variable name and value to look for when trying to detect recursive hook calls
     /// Defaults to using the --push-option added in git 2.10
@@ -131,7 +131,7 @@ struct SetupRequest {
         conflicts_with = "use_whitelist_recursion_detection",
         parse(from_str = "parse_env_base_recursion_detection")
     )]
-    env_based_recursion_detection: Option<EnvDetect>,
+    pub env_based_recursion_detection: Option<EnvDetect>,
 
     /// Disables recursive hook call checking
     /// This cannot be used with a custom subgit_working_clone_url due to the infinite recursion that occurs
@@ -141,11 +141,11 @@ struct SetupRequest {
         long = "use_whitelist_recursion_detection",
         conflicts_with = "env_based_recursion_detection"
     )]
-    disable_recursion_detection: bool,
+    pub disable_recursion_detection: bool,
 
     /// Only operate on the refs that start with these values - pass in a comma separated list
     #[structopt(short = "m", long = "match_ref", default_value = "refs/heads/,HEAD")]
-    match_ref: String,
+    pub match_ref: String,
 }
 
 impl SetupRequest {
