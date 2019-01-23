@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 pub use std::fs::{copy, create_dir, create_dir_all, remove_dir_all};
 
 #[allow(unused)]
-pub fn remove_if_exists<P: AsRef<Path>>(path: P) -> Result<(), Box<Error>> {
+pub fn remove_if_exists<P: AsRef<Path>>(path: P) -> Result<(), failure::Error> {
     if symlink_metadata(path.as_ref()).is_ok() {
         remove_dir_all(&path)?;
     }
@@ -47,7 +47,7 @@ pub fn write_content_to_file<P: AsRef<Path>, S: AsRef<str>>(path: &P, content: &
         .expect("Unable to write data");
 }
 
-pub fn make_absolute<P: AsRef<Path>>(relative_path: P) -> Result<PathBuf, Box<Error>> {
+pub fn make_absolute<P: AsRef<Path>>(relative_path: P) -> Result<PathBuf, failure::Error> {
     let mut abs_path = std::env::current_dir()?;
     abs_path.push(&relative_path);
     Ok(abs_path)
@@ -57,11 +57,11 @@ pub fn symlink_dirs<SP: AsRef<Path>, DP: AsRef<Path>>(
     source: &SP,
     dest: &DP,
     dirs: &Vec<&str>,
-) -> Result<(), Box<Error>> {
+) -> Result<(), failure::Error> {
     let abs_source = make_absolute(&source)?;
     let links: Result<Vec<()>, _> = dirs
         .iter()
-        .map(|&dir| -> Result<(), Box<Error>> {
+        .map(|&dir| -> Result<(), failure::Error> {
             Ok(std::os::unix::fs::symlink(
                 abs_source.join(dir),
                 dest.as_ref().join(dir),

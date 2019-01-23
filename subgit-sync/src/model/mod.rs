@@ -25,6 +25,8 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use rusqlite::Connection;
 
+use failure::format_err;
+
 pub struct WrappedSubGit {
     pub location: PathBuf,
     pub map: Connection,
@@ -86,7 +88,7 @@ impl WrappedSubGit {
     pub fn open<SP: AsRef<Path>, F: FnOnce(&Vec<String>)>(
         subgit_location: SP,
         before_load: Option<F>,
-    ) -> Result<Option<WrappedSubGit>, Box<Error>> {
+    ) -> Result<Option<WrappedSubGit>, failure::Error> {
         let subgit_top_path: &Path = subgit_location.as_ref();
         let subgit_data_path = subgit_top_path.join("data");
         info!("Loading settings");
@@ -143,7 +145,7 @@ impl WrappedSubGit {
         ref_name: S,
         old_sha: Oid,
         new_sha: Oid,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), failure::Error> {
         info!("Starting on hook!");
         if !self.filters.matches(&ref_name) {
             info!("Skipping non-applicable ref: {}", ref_name.as_ref());
@@ -197,9 +199,7 @@ impl WrappedSubGit {
             let new_old_local_sha =
                 self.import_upstream_commits(ref_name.as_ref(), old_upstream, real_upstream);
             if old != new_old_local_sha {
-                return Err(Box::new(util::StringError {
-                    message: "Out of sync with the upstream repo!".to_owned(),
-                }));
+                return Err(format_err!("Out of sync with the upstream repo!"));
             }
         }
 
@@ -292,7 +292,7 @@ impl WrappedSubGit {
         sha_copier.import_initial_empty_commits();
     }
 
-    pub fn update_all_from_upstream(&self) -> Result<(), Box<Error>> {
+    pub fn update_all_from_upstream(&self) -> Result<(), failure::Error> {
         let mut local_refs: std::collections::HashMap<String, git2::Oid> =
             git::get_refs(&self.local_bare, "**")?
                 .into_iter()
@@ -335,11 +335,11 @@ impl WrappedSubGit {
         upstream_working_clone_url: Option<String>,
         recursion_detection: RecursionDetection,
         filters: Vec<String>,
-    ) -> Result<WrappedSubGit, Box<Error>> {
+    ) -> Result<WrappedSubGit, failure::Error> {
         WriteLogger::init(
             LevelFilter::Debug,
             Config::default(),
-            File::create(log_file).unwrap(),
+            File::create(log_file.clone()).unwrap(),
         )
         .expect("Could not setup logging");
 
@@ -371,12 +371,12 @@ impl WrappedSubGit {
         let upstream_url_to_clone = upstream_working_clone_url
             .unwrap_or_else(|| upstream_path_abs.to_string_lossy().to_string());
         git::clone_remote(&upstream_url_to_clone, &subgit_data_path, "upstream");
-        let upstream_working = Repository::open(subgit_data_path.join("upstream")).unwrap();
+        let upstream_working = Repository::open(subgit_data_path.join("upstream"))?;
         git::disable_gc(&upstream_working);
         git::set_push_simple(&upstream_working);
 
         info!("Creating mirror bare access (using symlinks, but excluding hooks)");
-        let mirror_raw_path = fs::make_absolute(subgit_data_path.join("local.git")).unwrap();
+        let mirror_raw_path = fs::make_absolute(subgit_data_path.join("local.git"))?;
         fs::create_dir(&mirror_raw_path)?;
         // Symlink most directorys
         fs::symlink_dirs(

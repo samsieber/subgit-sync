@@ -10,7 +10,7 @@ use std::fs::File;
 use std::path::Path;
 use std::path::PathBuf;
 
-pub type RunResult = Result<(), Box<Error>>;
+pub type RunResult = Result<(), failure::Error>;
 
 pub trait RefFilter {
     fn matches<R: AsRef<str>>(&self, ref_name: R) -> bool;
@@ -266,7 +266,7 @@ pub enum Action {
     UpdateHook(UpdateHook),
 }
 
-pub fn lock<P: AsRef<Path>>(root: P) -> Result<File, Box<Error>> {
+pub fn lock<P: AsRef<Path>>(root: P) -> Result<File, failure::Error> {
     info!(
         "Trying to lock on {:?}",
         crate::fs::make_absolute(&root.as_ref().join("data/lock"))

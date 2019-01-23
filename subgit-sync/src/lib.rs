@@ -32,7 +32,7 @@ pub use crate::util::fork_into_child;
 pub use crate::util::StringError;
 pub use crate::cli::SetupRequest;
 
-pub fn run() -> Result<(), Box<Error>> {
+pub fn run() -> Result<(), failure::Error> {
     let exec_env = cli::ExecEnv::detect();
     let action = exec_env.parse_command(std::env::args())?;
     action.run()

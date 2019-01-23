@@ -1,6 +1,6 @@
 [package]
 name = "subgit-sync"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Sam Sieber <ssieber@simplifile.com>"]
 edition = "2018"
 
@@ -19,6 +19,8 @@ log-panics = "2.0.0"
 
 chrono = { version = "0.4" }
 rusqlite = { version = "0.15.0", features = ["bundled", "chrono"]}
+
+failure = "*"
 
 [dependencies.log]
 version = "0.4"

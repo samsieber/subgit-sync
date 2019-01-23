@@ -15,6 +15,7 @@ use std::io::Read;
 use std::path::PathBuf;
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
+use failure::format_err;
 
 pub enum ExecEnv {
     Subgit(SubGitEnv),
@@ -22,7 +23,7 @@ pub enum ExecEnv {
     Setup(PathBuf),
 }
 
-fn find_subgit_from_hook() -> Result<PathBuf, Box<Error>> {
+fn find_subgit_from_hook() -> Result<PathBuf, failure::Error> {
     let path = env::current_exe()?;
     if std::fs::symlink_metadata(&path)?.file_type().is_symlink() {
         Ok(read_link(&path)?)
@@ -149,7 +150,7 @@ pub struct SetupRequest {
 }
 
 impl SetupRequest {
-    fn convert(self, copy_from: PathBuf) -> Result<Action, Box<Error>> {
+    fn convert(self, copy_from: PathBuf) -> Result<Action, failure::Error> {
         let recursion_detection = if self.disable_recursion_detection {
             action::RecursionDetection::UpdateWhitelist(action::UpdateWhitelist {
                 path: make_absolute(
@@ -235,7 +236,7 @@ impl ExecEnv {
         }
     }
 
-    pub fn parse_command<I>(self, iterable: I) -> Result<Action, Box<Error>>
+    pub fn parse_command<I>(self, iterable: I) -> Result<Action, failure::Error>
     where
         I: IntoIterator,
         I::Item: Into<OsString> + Clone,
@@ -248,7 +249,7 @@ impl ExecEnv {
                 let reqs = s
                     .lines()
                     .map(|v| v.trim())
-                    .map(|line| -> Result<action::RefSyncRequest, Box<Error>> {
+                    .map(|line| -> Result<action::RefSyncRequest, failure::Error> {
                         let entries = line.split(" ").collect::<Vec<&str>>();
                         match entries[..] {
                             [old_sha, new_sha, ref_name] => Ok(action::RefSyncRequest {
@@ -256,12 +257,10 @@ impl ExecEnv {
                                 old_upstream_sha: Oid::from_str(old_sha)?,
                                 new_upstream_sha: Oid::from_str(new_sha)?,
                             }),
-                            _ => Err(Box::new(StringError {
-                                message: "Bad args".to_owned(),
-                            })),
+                            _ => Err(format_err!("Bad args")),
                         }
                     })
-                    .collect::<Result<Vec<action::RefSyncRequest>, Box<Error>>>()?;
+                    .collect::<Result<Vec<action::RefSyncRequest>, failure::Error>>()?;
 
                 Ok(Action::SyncRefs(action::SyncRefs {
                     env,
@@ -278,9 +277,7 @@ impl ExecEnv {
                 match args.len() {
                     2 => match string_args[1].as_str() {
                         "sync-all" => Ok(Action::SyncAll(action::SyncAll { env })),
-                        bad_arg => Err(Box::new(StringError {
-                            message: format!("Invalid argument: '{}'", bad_arg).to_owned(),
-                        })),
+                        bad_arg => Err(format_err!("Invalid argument: '{}'", bad_arg)),
                     },
                     4 => Ok(Action::UpdateHook(action::UpdateHook {
                         env,
@@ -288,9 +285,7 @@ impl ExecEnv {
                         old_sha: Oid::from_str(string_args.get(2).unwrap())?,
                         new_sha: Oid::from_str(string_args.get(3).unwrap())?,
                     })),
-                    _ => Err(Box::new(StringError {
-                        message: format!("Unknown argument structure: '{}'", string_args.join(" ")),
-                    })),
+                    _ => Err(format_err!("Unknown argument structure: '{}'", string_args.join(" "))),
                 }
             }
             ExecEnv::Setup(path) => SetupRequest::from_iter(iterable).convert(path),

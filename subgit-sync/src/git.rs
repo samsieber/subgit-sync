@@ -2,8 +2,8 @@ use crate::util::StringError;
 use git2;
 use git2::{Commit, Oid, Repository, Signature, Sort};
 use std;
-use std::error::Error;
 use std::path::Path;
+use failure::format_err;
 
 pub fn get_git_options() -> Option<Vec<String>> {
     std::env::var_os("GIT_PUSH_OPTION_COUNT").map(|v| {
@@ -142,7 +142,7 @@ pub fn find_earliest_commit(repo: &Repository) -> Oid {
     walker.nth(0).unwrap().unwrap()
 }
 
-pub fn fetch_all_ext(repo: &Repository) -> Result<(), Box<Error>> {
+pub fn fetch_all_ext(repo: &Repository) -> Result<(), failure::Error> {
     let mut process = std::process::Command::new("git");
     process
         .env_clear()
@@ -159,13 +159,11 @@ pub fn fetch_all_ext(repo: &Repository) -> Result<(), Box<Error>> {
     let result = process.output()?;
 
     if !result.status.success() {
-        return Err(Box::new(StringError {
-            message: format!(
+        return Err(format_err!(
                 "Could not fetch all- exit code was {}. Full result of fetch: {}",
                 &result.status,
                 String::from_utf8(result.stderr)?
-            ),
-        }));
+            ));
     }
 
     Ok(())
@@ -225,7 +223,7 @@ pub fn push_sha_ext<S: AsRef<str>>(
     ref_name: S,
     force_push: bool,
     git_push_options: Option<Vec<String>>,
-) -> Result<(), Box<Error>> {
+) -> Result<(), failure::Error> {
     let mut process = std::process::Command::new("git");
     process
         .env_clear()
@@ -258,13 +256,11 @@ pub fn push_sha_ext<S: AsRef<str>>(
     let result = process.output()?;
 
     if !result.status.success() {
-        return Err(Box::new(StringError {
-            message: format!(
+        return Err(format_err!(
                 "Could not push - exit code was {}. Full result of push: {}",
                 &result.status,
                 String::from_utf8(result.stderr)?
-            ),
-        }));
+            ));
     }
 
     Ok(())
@@ -274,7 +270,7 @@ pub fn delete_remote_branch<S: AsRef<str>>(
     repo: &Repository,
     ref_name: S,
     git_push_options: Option<Vec<String>>,
-) -> Result<(), Box<Error>> {
+) -> Result<(), failure::Error> {
     let mut process = std::process::Command::new("git");
     process
         .env_clear()
@@ -296,13 +292,11 @@ pub fn delete_remote_branch<S: AsRef<str>>(
     let result = process.output()?;
 
     if !result.status.success() {
-        return Err(Box::new(StringError {
-            message: format!(
+        return Err(format_err!(
                 "Could not push - exit code was {}. Full result of push: {}",
                 &result.status,
                 String::from_utf8(result.stderr)?
-            ),
-        }));
+            ));
     }
 
     Ok(())
@@ -315,7 +309,7 @@ pub fn commit_empty(
     committer: &Signature,
     message: &str,
     parents: &[&Commit],
-) -> Result<Oid, Box<Error>> {
+) -> Result<Oid, failure::Error> {
     let new_empty_tree_oid = repo.treebuilder(None)?.write()?;
     let new_empty_tree = repo.find_tree(new_empty_tree_oid)?;
 
@@ -329,7 +323,7 @@ pub fn commit_empty(
     )?)
 }
 
-pub fn get_refs(repo: &Repository, glob: &str) -> Result<Vec<(String, Oid)>, Box<Error>> {
+pub fn get_refs(repo: &Repository, glob: &str) -> Result<Vec<(String, Oid)>, failure::Error> {
     let ref_list: Result<Vec<(String, Oid)>, _> = repo
         .references_glob(glob)?
         .map(|r| {
