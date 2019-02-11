@@ -15,8 +15,6 @@ extern crate log_panics;
 extern crate nix;
 extern crate simplelog;
 
-use std::error::Error;
-
 mod action;
 mod cli;
 mod fs;

@@ -153,7 +153,7 @@ impl<'a> Copier<'a> {
             .unwrap()
     }
 
-    pub fn import_initial_empty_commits(&'a self) {
+    pub fn import_initial_empty_commits(self) {
         let commits_to_import = git::find_safe_empty_na_commits(
             self.source.bare,
             self.source.location.to_string_lossy().as_ref(),
@@ -174,10 +174,11 @@ impl<'a> Copier<'a> {
                 first_oid,
             );
         }
+        self.mapper.save_changes();
     }
 
     pub fn copy_ref_unchecked<PL: PushListener>(
-        &'a self,
+        self,
         ref_name: &str,
         supposed_old_source_sha: Option<Oid>,
         new_source_sha: Option<Oid>,
@@ -289,10 +290,12 @@ impl<'a> Copier<'a> {
 
         res.unwrap();
 
+        self.mapper.save_changes();
+
         Some(new_sha)
     }
 
-    pub fn copy_commit(&'a self, source_sha: &Oid) -> Oid {
+    fn copy_commit(&'a self, source_sha: &Oid) -> Oid {
         debug!(
             "Copying commit {} from '{}' to '{}'",
             source_sha, self.source.name, self.dest.name

@@ -1,5 +1,4 @@
 use std;
-use std::error::Error;
 use std::fs::symlink_metadata;
 use std::fs::File;
 use std::fs::OpenOptions;

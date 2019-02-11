@@ -1,4 +1,3 @@
-use crate::util::StringError;
 use git2;
 use git2::{Commit, Oid, Repository, Signature, Sort};
 use std;

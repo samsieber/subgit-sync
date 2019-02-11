@@ -1,12 +1,10 @@
 use git2;
 use git2::{Oid, Repository};
 use std;
-use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use crate::fs;
 use crate::git;
-use crate::util;
 
 mod copier;
 mod map;
@@ -26,19 +24,67 @@ use std::fmt::Formatter;
 use rusqlite::Connection;
 
 use failure::format_err;
+use crate::model::map::ReadOnlyMapper;
 
 pub struct WrappedSubGit {
     pub location: PathBuf,
     pub map: Connection,
+
+    pub recursion_detection: RecursionDetection,
+    pub filters: Vec<String>,
+
+    pub lock: File,
+
+    pub workspace: Workspace,
+}
+
+pub struct Workspace {
     pub upstream_working: Repository,
     pub upstream_bare: Repository,
     pub upstream_path: String,
     pub local_working: Repository,
     pub local_bare: Repository,
     pub local_path: String,
-    pub recursion_detection: RecursionDetection,
-    pub filters: Vec<String>,
-    pub lock: File,
+}
+
+impl Workspace {
+    fn get_importer<'w>(&'w self, map: &'w mut Connection) -> copier::Copier<'w> {
+        let mapper = map::CommitMapper::new(map);
+        copier::Copier {
+            source: copier::GitLocation {
+                name: Location::UPSTREAM,
+                bare: &self.upstream_bare,
+                working: &self.upstream_working,
+                location: &self.upstream_path.as_str().as_ref(),
+            },
+            dest: copier::GitLocation {
+                name: Location::SUBGIT,
+                bare: &self.local_bare,
+                working: &self.local_working,
+                location: &self.local_path.as_ref(),
+            },
+            mapper,
+        }
+    }
+
+    fn get_exporter<'w>(&'w self, map: &'w mut Connection) -> copier::Copier<'w> {
+        let mapper = map::CommitMapper::new(map);
+        copier::Copier {
+            dest: copier::GitLocation {
+                name: Location::UPSTREAM,
+                bare: &self.upstream_bare,
+                working: &self.upstream_working,
+                location: &self.upstream_path.as_str().as_ref(),
+            },
+            source: copier::GitLocation {
+                name: Location::SUBGIT,
+                bare: &self.local_bare,
+                working: &self.local_working,
+                location: &self.local_path.as_ref(),
+            },
+            mapper,
+        }
+    }
 }
 
 pub struct BinSource {
@@ -111,15 +157,17 @@ impl WrappedSubGit {
             Ok(Some(WrappedSubGit {
                 location: subgit_top_path.to_owned(),
                 map: Connection::open(subgit_data_path.join("map.sqlite")).expect("Cannot find map file"),
-                upstream_working: Repository::open(subgit_data_path.join("upstream"))?,
-                upstream_bare: Repository::open(subgit_data_path.join("upstream.git"))?,
-                upstream_path: git_settings.upstream_path(),
-                local_working: Repository::open(subgit_data_path.join("local"))?,
-                local_bare: Repository::open(subgit_data_path.join("local.git"))?,
-                local_path: git_settings.local_path(),
                 recursion_detection: git_settings.recursion_detection(),
                 filters: git_settings.filters(),
                 lock,
+                workspace: Workspace {
+                    upstream_working: Repository::open(subgit_data_path.join("upstream"))?,
+                    upstream_bare: Repository::open(subgit_data_path.join("upstream.git"))?,
+                    upstream_path: git_settings.upstream_path(),
+                    local_working: Repository::open(subgit_data_path.join("local"))?,
+                    local_bare: Repository::open(subgit_data_path.join("local.git"))?,
+                    local_path: git_settings.local_path(),
+                }
             }))
         }
     }
@@ -136,12 +184,12 @@ impl WrappedSubGit {
     }
 
     pub fn update_self(&self) {
-        git::fetch_all_ext(&self.local_working).unwrap();
-        git::fetch_all_ext(&self.upstream_working).unwrap();
+        git::fetch_all_ext(&self.workspace.local_working).unwrap();
+        git::fetch_all_ext(&self.workspace.upstream_working).unwrap();
     }
 
     pub fn push_ref_change_upstream<S: AsRef<str>>(
-        &self,
+        &mut self,
         ref_name: S,
         old_sha: Oid,
         new_sha: Oid,
@@ -177,10 +225,11 @@ impl WrappedSubGit {
             old,
             new
         );
-        let mapper = map::CommitMapper { conn: &self.map };
+        let mapper = map::ReadOnlyMapper::new(&mut self.map);
 
         let old_upstream = mapper.get_translated(old.as_ref(), Location::SUBGIT);
         let real_upstream = self
+            .workspace
             .upstream_bare
             .find_reference(ref_name.as_ref())
             .map(|reference| {
@@ -213,12 +262,12 @@ impl WrappedSubGit {
     }
 
     fn export_local_commits(
-        &self,
+        &mut self,
         ref_name: &str,
         old_local_sha: Option<Oid>,
         new_local_sha: Option<Oid>,
     ) -> Option<Oid> {
-        let sha_copier = self.get_exporter();
+        let sha_copier = self.workspace.get_exporter(&mut self.map);
 
         sha_copier.copy_ref_unchecked(
             ref_name,
@@ -231,12 +280,12 @@ impl WrappedSubGit {
     }
 
     pub fn import_upstream_commits(
-        &self,
+        &mut self,
         ref_name: &str,
         old_upstream_sha: Option<Oid>,
         new_upstream_sha: Option<Oid>,
     ) -> Option<Oid> {
-        let sha_copier = self.get_importer();
+        let sha_copier = self.workspace.get_importer(&mut self.map);
 
         sha_copier.copy_ref_unchecked(
             ref_name,
@@ -248,72 +297,33 @@ impl WrappedSubGit {
         )
     }
 
-    fn get_importer<'a>(&'a self) -> copier::Copier<'a> {
-        let mapper = map::CommitMapper { conn: &self.map };
-        copier::Copier {
-            source: copier::GitLocation {
-                name: Location::UPSTREAM,
-                bare: &self.upstream_bare,
-                working: &self.upstream_working,
-                location: &self.upstream_path.as_str().as_ref(),
-            },
-            dest: copier::GitLocation {
-                name: Location::SUBGIT,
-                bare: &self.local_bare,
-                working: &self.local_working,
-                location: &self.local_path.as_ref(),
-            },
-            mapper: mapper,
-        }
-    }
-
-    fn get_exporter<'a>(&'a self) -> copier::Copier<'a> {
-        let mapper = map::CommitMapper { conn: &self.map };
-        copier::Copier {
-            dest: copier::GitLocation {
-                name: Location::UPSTREAM,
-                bare: &self.upstream_bare,
-                working: &self.upstream_working,
-                location: &self.upstream_path.as_str().as_ref(),
-            },
-            source: copier::GitLocation {
-                name: Location::SUBGIT,
-                bare: &self.local_bare,
-                working: &self.local_working,
-                location: &self.local_path.as_ref(),
-            },
-            mapper: mapper,
-        }
-    }
-
-    pub fn import_initial_empty_commits(&self) {
-        let sha_copier = self.get_importer();
+    pub fn import_initial_empty_commits(&mut self) {
+        let sha_copier = self.workspace.get_importer(&mut self.map);
 
         sha_copier.import_initial_empty_commits();
     }
 
-    pub fn update_all_from_upstream(&self) -> Result<(), failure::Error> {
+    pub fn update_all_from_upstream(&mut self) -> Result<(), failure::Error> {
         let mut local_refs: std::collections::HashMap<String, git2::Oid> =
-            git::get_refs(&self.local_bare, "**")?
+            git::get_refs(&self.workspace.local_bare, "**")?
                 .into_iter()
                 .filter(|&(ref name, ref _target)| self.filters.matches(&name))
                 .collect();
 
-        let mapper = map::CommitMapper { conn: &self.map };
-
-        git::get_refs(&self.upstream_bare, "**")?
+        git::get_refs(&self.workspace.upstream_bare, "**")?
             .into_iter()
-            .filter(|&(ref name, ref _target)| self.filters.matches(&name))
             .for_each(|(ref_name, upstream_sha)| {
-                info!("Importing {}", ref_name);
-                let local_sha = local_refs.remove(&ref_name);
-                info!(
-                    "Importing {} to point to {} (Was {:?} in the local)",
-                    ref_name, upstream_sha, local_sha
-                );
-                let old_upstream_sha = mapper.get_translated(local_sha.as_ref(), Location::UPSTREAM);
+                if self.filters.matches(&ref_name) {
+                    info!("Importing {}", ref_name);
+                    let local_sha = local_refs.remove(&ref_name);
+                    info!(
+                        "Importing {} to point to {} (Was {:?} in the local)",
+                        ref_name, upstream_sha, local_sha
+                    );
+                    let old_upstream_sha = ReadOnlyMapper::new(&self.map).get_translated(local_sha.as_ref(), Location::UPSTREAM);
 
-                &self.import_upstream_commits(&ref_name, old_upstream_sha, Some(upstream_sha));
+                    self.import_upstream_commits(&ref_name, old_upstream_sha, Some(upstream_sha));
+                }
             });
 
         // TODO: iterate over the leftover keys
@@ -356,7 +366,7 @@ impl WrappedSubGit {
         fs::create_dir_all(subgit_data_path.join("logs"))?;
 
         info!("Creating the mapping repo");
-        let map = Connection::open(subgit_data_path.join("map.sqlite"))?;
+        let mut map = Connection::open(subgit_data_path.join("map.sqlite"))?;
         #[allow(non_snake_case)]
         let EMPTY : Vec<String>= vec!();
         map.execute(&Location::UPSTREAM.create_statement(), &EMPTY).unwrap();
@@ -439,10 +449,12 @@ impl WrappedSubGit {
             git::push_sha_ext(&upstream_working, "refs/sync/empty", false, None)?;
             info!("Created {} as the empty upstream ref", &upstream_empty_sha);
 
-            let mapper = CommitMapper { conn: &map };
+            let mapper = CommitMapper::new(&mut map);
 
             mapper.set_translated(&upstream_empty_sha, Location::UPSTREAM, &subgit_empty_sha);
             mapper.set_translated(&subgit_empty_sha, Location::SUBGIT, &upstream_empty_sha);
+
+            mapper.save_changes();
         }
 
         info!("Generating settings file");
@@ -496,15 +508,17 @@ impl WrappedSubGit {
         Ok(WrappedSubGit {
             location: subgit_location.as_ref().to_owned(),
             map,
-            upstream_working,
-            upstream_bare,
-            upstream_path: upstream_map_path.to_owned(),
-            local_working: mirror_working,
-            local_bare: Repository::open_bare(subgit_data_path.join("local.git"))?,
-            local_path: subgit_map_path.unwrap_or("").to_owned(),
             recursion_detection,
             filters,
             lock,
+            workspace: Workspace {
+                upstream_working,
+                upstream_bare,
+                upstream_path: upstream_map_path.to_owned(),
+                local_working: mirror_working,
+                local_bare: Repository::open_bare(subgit_data_path.join("local.git"))?,
+                local_path: subgit_map_path.unwrap_or("").to_owned(),
+            }
         })
     }
 }

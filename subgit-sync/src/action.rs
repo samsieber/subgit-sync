@@ -4,7 +4,6 @@ use git2::Oid;
 use hex;
 use log::LevelFilter;
 use std::env;
-use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::path::Path;
@@ -284,7 +283,7 @@ impl Setup {
         let subgit_map_path = self
             .subgit_map_path
             .map(|v| v.to_string_lossy().to_string());
-        let wrapped = crate::model::WrappedSubGit::run_creation(
+        let mut wrapped = crate::model::WrappedSubGit::run_creation(
             self.subgit_git_location,
             self.upstream_git_location,
             self.upstream_map_path.to_str().unwrap(),
@@ -315,7 +314,7 @@ impl UpdateHook {
     pub fn run(self) -> RunResult {
         let maybe_wrapped = crate::model::WrappedSubGit::open(self.env.git_dir, Some(empty))?;
 
-        if let Some(wrapped) = maybe_wrapped {
+        if let Some(mut wrapped) = maybe_wrapped {
             info!("Opened Wrapped");
             info!("Running update");
             wrapped.update_self();
@@ -332,7 +331,7 @@ impl SyncAll {
     pub fn run(self) -> RunResult {
         let maybe_wrapped = crate::model::WrappedSubGit::open(self.env.git_dir, Some(empty))?;
 
-        if let Some(wrapped) = maybe_wrapped {
+        if let Some(mut wrapped) = maybe_wrapped {
             info!("Running Sync All");
 
             wrapped.update_self();
@@ -361,21 +360,21 @@ impl SyncRefs {
             }),
         )?;
 
-        if let Some(wrapped) = maybe_wrapped {
+        if let Some(mut wrapped) = maybe_wrapped {
             info!("Running Sync Refs");
 
             wrapped.update_self();
             self.requests
                 .into_iter()
-                .filter(|req| wrapped.filters.matches(&req.ref_name))
                 .for_each(|request| {
-                    wrapped.import_upstream_commits(
-                        &request.ref_name,
-                        git::optionify_sha(request.old_upstream_sha),
-                        git::optionify_sha(request.new_upstream_sha),
-                    );
+                    if wrapped.filters.matches(&request.ref_name){
+                        wrapped.import_upstream_commits(
+                            &request.ref_name,
+                            git::optionify_sha(request.old_upstream_sha),
+                            git::optionify_sha(request.new_upstream_sha),
+                        );
+                    }
                 });
-
             Ok(())
         } else {
             Ok(())
