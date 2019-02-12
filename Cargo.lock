@@ -103,7 +103,7 @@ name = "declarative"
 version = "0.1.0"
 dependencies = [
  "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "subgit-sync 0.3.1",
+ "subgit-sync 0.3.2",
 ]
 
 [[package]]
@@ -423,7 +423,7 @@ dependencies = [
 
 [[package]]
 name = "subgit-sync"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "chrono 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -502,7 +502,7 @@ dependencies = [
  "maplit 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.66 (registry+https://github.com/rust-lang/crates.io-index)",
  "simplelog 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "subgit-sync 0.3.1",
+ "subgit-sync 0.3.2",
 ]
 
 [[package]]
