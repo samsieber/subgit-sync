@@ -6,6 +6,7 @@ Consider using this when:
 1) You have a subset of some repository you'd like to expose to more people, but without exposing the top level code
 2) You self host the git repos of interest
 3) You want this to be completely transparent to the end users of the top level repo
+4) You only need on branch synced (it can't handle more than that *right now*)
 
 ### Basic Anatomy of Subgit
 
