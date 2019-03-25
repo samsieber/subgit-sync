@@ -22,7 +22,7 @@ libgit2 rust bindings and a few other rust dependencies (logging, command line o
 
 ### Limitations
 
-Subgit currently does not do well when tracking multiple branches (see https://github.com/samsieber/subgit-sync/issues/2) - luckily there is a cli option to control what branches / refspecs will be sync'd.
+Subgit **will occassionally & silenly merge in branches in the upstream** when tracking multiple branches (see https://github.com/samsieber/subgit-sync/issues/2) if you're pushing to the subgit - luckily there is a cli option to control what branches / refspecs will be sync'd. **Only use this on one branch**
 
 Subgit isn't very well tested. Though it's currently being used, it hasn't been very used, and latent commit eating bugs may exist.
 
